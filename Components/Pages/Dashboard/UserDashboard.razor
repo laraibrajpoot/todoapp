@@ -1,0 +1,263 @@
+﻿@page "/user/dashboard"
+@page "/userdashboard"
+@layout todolist.Components.Layout.UserLayout
+
+@using todolist.Models
+@using System.Security.Claims
+@inject todolist.Services.TaskService TaskService
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthProvider
+
+<PageTitle>User Dashboard</PageTitle>
+
+<div class="dashboard-container" style="display: flex; flex-direction: column; gap: 24px;">
+
+    <!-- Welcome Header Banner matching Sample Pic -->
+    <section class="welcome-banner-section" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden;">
+        <div style="z-index: 2;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                <span style="font-size: 2rem;">👋</span>
+                <h2 style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin: 0;">@timeGreeting, @userName</h2>
+            </div>
+            <p style="color: #64748b; font-size: 0.95rem; margin: 0;">Stay organized, stay productive!</p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 40px; z-index: 2;">
+            <div style="font-family: 'Brush Script MT', cursive, sans-serif; font-size: 1.8rem; font-weight: bold; color: #1e3a8a; transform: rotate(-3deg);">
+                You got this!
+            </div>
+        </div>
+    </section>
+
+    <!-- Top 4 Stat Cards matching Sample Pic -->
+    <section class="overview-section" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 100%;">
+        <!-- Total Tasks -->
+        <div class="stat-card" style="background: white; padding: 20px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="width: 42px; height: 42px; background: #e0f2fe; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 12px;">📋</div>
+                <h3 style="font-size: 0.9rem; color: #64748b; margin: 0 0 4px 0; font-weight: 600;">Total Tasks</h3>
+                <p style="font-size: 1.8rem; font-weight: bold; margin: 0 0 4px 0; color: #0f172a;">@totalTasks</p>
+                <span style="font-size: 0.75rem; color: #94a3b8;">No tasks yet</span>
+            </div>
+            <span style="color: #3b82f6; font-size: 1.2rem; font-weight: bold;">&rarr;</span>
+        </div>
+
+        <!-- Pending -->
+        <div class="stat-card" style="background: #fff5f5; padding: 20px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="width: 42px; height: 42px; background: #fee2e2; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 12px;">⏳</div>
+                <h3 style="font-size: 0.9rem; color: #991b1b; margin: 0 0 4px 0; font-weight: 600;">Pending</h3>
+                <p style="font-size: 1.8rem; font-weight: bold; margin: 0 0 4px 0; color: #ef4444;">@pending</p>
+                <span style="font-size: 0.75rem; color: #b91c1c;">To be completed</span>
+            </div>
+            <span style="color: #ef4444; font-size: 1.2rem; font-weight: bold;">&rarr;</span>
+        </div>
+
+        <!-- In Progress -->
+        <div class="stat-card" style="background: #fffbeb; padding: 20px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="width: 42px; height: 42px; background: #fef3c7; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 12px;">⌛</div>
+                <h3 style="font-size: 0.9rem; color: #92400e; margin: 0 0 4px 0; font-weight: 600;">In Progress</h3>
+                <p style="font-size: 1.8rem; font-weight: bold; margin: 0 0 4px 0; color: #f59e0b;">@inProgress</p>
+                <span style="font-size: 0.75rem; color: #b45309;">Currently working</span>
+            </div>
+            <span style="color: #f59e0b; font-size: 1.2rem; font-weight: bold;">&rarr;</span>
+        </div>
+
+        <!-- Completed -->
+        <div class="stat-card" style="background: #f0fdf4; padding: 20px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="width: 42px; height: 42px; background: #dcfce7; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 12px;">✅</div>
+                <h3 style="font-size: 0.9rem; color: #166534; margin: 0 0 4px 0; font-weight: 600;">Completed</h3>
+                <p style="font-size: 1.8rem; font-weight: bold; margin: 0 0 4px 0; color: #16a34a;">@completed</p>
+                <span style="font-size: 0.75rem; color: #15803d;">Great work!</span>
+            </div>
+            <span style="color: #16a34a; font-size: 1.2rem; font-weight: bold;">&rarr;</span>
+        </div>
+    </section>
+
+    <!-- Overall Progress Bar matching Sample Pic -->
+    <section class="section-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; background: #f3e8ff; border-radius: 8px; display: flex; align-items: center; justify-content: center;">🎯</div>
+                <h3 style="font-size: 1.15rem; color: #1e293b; margin: 0;">Overall Progress</h3>
+            </div>
+            <span style="font-size: 0.85rem; color: #d97706; font-weight: 500;">⭐ Every task completed brings you closer to your goals!</span>
+        </div>
+        <div class="progress-bar-container" style="background:#f1f5f9; border-radius:10px; height:16px; width:100%; overflow:hidden; margin-bottom: 12px;">
+            <div class="progress-fill" style="background: linear-gradient(90deg, #2563eb, #16a34a); height:100%; width:@progressPercent%; transition: width 0.3s ease;"></div>
+        </div>
+        <p style="margin: 0; font-weight: bold; color: #475569; font-size: 0.9rem;">@progressPercent% Completed</p>
+    </section>
+
+    <!-- Bottom Section: Priority Breakdown & Right Quick Actions Grid -->
+    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start;">
+
+        <!-- Active Tasks Priority Breakdown (Circular Ring Visual) -->
+        <section class="section-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 36px; height: 36px; background: #eff6ff; border-radius: 8px; display: flex; align-items: center; justify-content: center;">📊</div>
+                    <h3 style="font-size: 1.15rem; color: #1e293b; margin: 0;">Active Tasks Priority Breakdown</h3>
+                </div>
+                <a href="/user/tasks" style="font-size: 0.85rem; color: #2563eb; text-decoration: none; font-weight: 600;">View All Tasks &rarr;</a>
+            </div>
+            <p style="font-size: 0.85rem; color: #64748b; margin-top: 0; margin-bottom: 24px;">Categorized dynamically by deadline urgency (excluding completed tasks).</p>
+
+            <div style="display: flex; align-items: center; justify-content: space-around; padding: 20px 0;">
+                <div style="position: relative; width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#ef4444 0deg 120deg, #f59e0b 120deg 240deg, #3b82f6 240deg 360deg); display: flex; align-items: center; justify-content: center;">
+                    <div style="width: 100px; height: 100px; background: white; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        <span style="font-size: 1.5rem; font-weight: bold; color: #0f172a;">@activeTasksCount</span>
+                        <span style="font-size: 0.75rem; color: #64748b;">Active Tasks</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 16px; flex: 1; max-width: 220px; margin-left: 20px;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">
+                            <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span> High</span>
+                            <span>@highPriorityCount</span>
+                        </div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; margin-left: 14px;">(&le; 3 Days)</div>
+                    </div>
+
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">
+                            <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span> Medium</span>
+                            <span>@medPriorityCount</span>
+                        </div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; margin-left: 14px;">(4–7 Days)</div>
+                    </div>
+
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">
+                            <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></span> Low</span>
+                            <span>@lowPriorityCount</span>
+                        </div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; margin-left: 14px;">(&gt; 7 Days)</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Quick Actions Card -->
+        <div style="background: white; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden;">
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 20px; color: white;">
+                <h4 style="font-size: 1rem; font-weight: bold; margin: 0 0 6px 0;">Organize today, achieve tomorrow</h4>
+                <p style="font-size: 0.8rem; color: #cbd5e1; margin: 0;">Manage your tasks, track progress and get things done!</p>
+            </div>
+            <div style="padding: 16px;">
+                <h5 style="font-size: 0.9rem; font-weight: bold; color: #1e293b; margin: 0 0 12px 0; display: flex; align-items: center; gap: 6px;">
+                    <span>⚡</span> Quick Actions
+                </h5>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <a href="/user/tasks" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #f8fafc; border-radius: 10px; text-decoration: none; color: #1e293b; font-size: 0.85rem; font-weight: 500; border: 1px solid #e2e8f0;">
+                        <span style="display: flex; align-items: center; gap: 10px;"><span style="color: #2563eb;">➕</span> Add New Task</span>
+                        <span style="color: #94a3b8;">&rsaquo;</span>
+                    </a>
+                    <a href="/user/tasks" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #f8fafc; border-radius: 10px; text-decoration: none; color: #1e293b; font-size: 0.85rem; font-weight: 500; border: 1px solid #e2e8f0;">
+                        <span style="display: flex; align-items: center; gap: 10px;"><span style="color: #2563eb;">📋</span> View All Tasks</span>
+                        <span style="color: #94a3b8;">&rsaquo;</span>
+                    </a>
+                    <a href="/user/profile" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #f8fafc; border-radius: 10px; text-decoration: none; color: #1e293b; font-size: 0.85rem; font-weight: 500; border: 1px solid #e2e8f0;">
+                        <span style="display: flex; align-items: center; gap: 10px;"><span style="color: #2563eb;">👤</span> View Profile</span>
+                        <span style="color: #94a3b8;">&rsaquo;</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    private List<TaskItem> tasks = new();
+    private int totalTasks = 0;
+    private int pending = 0;
+    private int inProgress = 0;
+    private int completed = 0;
+    private int progressPercent = 0;
+
+    private string userName = "User";
+    private string timeGreeting = "Good Day";
+
+    private int highPriorityCount = 0;
+    private int medPriorityCount = 0;
+    private int lowPriorityCount = 0;
+    private int activeTasksCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DetermineTimeGreeting();
+        await LoadDashboardMetricsAsync();
+    }
+
+    private void DetermineTimeGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+        // Correct time range logic:
+        // 5 AM to 11:59 AM -> Good Morning
+        // 12 PM to 4:59 PM -> Good Afternoon
+        // 5 PM to 4:59 AM -> Good Evening (handles late night like 12:16 AM properly)
+        if (hour >= 5 && hour < 12)
+        {
+            timeGreeting = "Good Morning";
+        }
+        else if (hour >= 12 && hour < 17)
+        {
+            timeGreeting = "Good Afternoon";
+        }
+        else
+        {
+            timeGreeting = "Good Evening";
+        }
+    }
+
+    private async Task LoadDashboardMetricsAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is { IsAuthenticated: true })
+        {
+            var nameClaim = user.FindFirst(ClaimTypes.Name)?.Value ?? user.Identity.Name;
+            if (!string.IsNullOrEmpty(nameClaim))
+            {
+                userName = nameClaim;
+            }
+
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (int.TryParse(userIdClaim, out int loggedInUserId))
+            {
+                tasks = await TaskService.GetTasksForUserAsync(loggedInUserId);
+
+                totalTasks = tasks.Count;
+                pending = tasks.Count(t => string.Equals(t.Status?.Trim(), "Pending", StringComparison.OrdinalIgnoreCase));
+                inProgress = tasks.Count(t => string.Equals(t.Status?.Trim(), "In Progress", StringComparison.OrdinalIgnoreCase));
+                completed = tasks.Count(t => string.Equals(t.Status?.Trim(), "Completed", StringComparison.OrdinalIgnoreCase));
+
+                if (totalTasks > 0)
+                {
+                    progressPercent = (int)Math.Round((double)completed / totalTasks * 100);
+                }
+                else
+                {
+                    progressPercent = 0;
+                }
+
+                var activeTasks = tasks
+                    .Where(t => !string.Equals(t.Status?.Trim(), "Completed", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                activeTasksCount = activeTasks.Count;
+
+                var today = DateTime.Today;
+
+                highPriorityCount = activeTasks.Count(t => (t.Deadline.Date - today).TotalDays <= 3);
+                medPriorityCount = activeTasks.Count(t => (t.Deadline.Date - today).TotalDays > 3 && (t.Deadline.Date - today).TotalDays <= 7);
+                lowPriorityCount = activeTasks.Count(t => (t.Deadline.Date - today).TotalDays > 7);
+            }
+        }
+    }
+}

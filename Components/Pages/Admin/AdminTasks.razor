@@ -1,0 +1,484 @@
+﻿@page "/admin/tasks"
+@layout AdminLayout
+@rendermode InteractiveServer
+@inject todolist.Services.UserService UserService
+@inject todolist.Services.TaskService TaskService
+@inject IJSRuntime JSRuntime
+<style>
+    .form-control:focus,
+    .form-select:focus {
+        outline: none !important;
+        box-shadow: none !important;
+        background-color: transparent !important;
+        border-color: transparent !important;
+    }
+</style>
+
+<div class="container-fluid px-4 py-4" style="max-width: 1300px;">
+    
+    <!-- Top Header Banner (Title Only) -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-3" style="background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);">
+        <div class="row align-items-center">
+            <div class="col-12">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-3 p-2 text-white me-3 d-flex align-items-center justify-content-center shadow-sm" style="background-color: #0d3b66; width: 45px; height: 45px;">
+                        <i class="bi bi-clipboard-plus fs-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="fw-bold text-dark mb-0">Assign New Task</h3>
+                        <p class="text-muted small mb-0">Create and assign tasks to team members across all departments.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Separate Card Box for Task Creation Form -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
+        <EditForm Model="@newTask" OnValidSubmit="HandleCreateTask">
+            <DataAnnotationsValidator />
+
+            <div class="row g-3 align-items-center">
+                <!-- Task Title Input -->
+<div class="col-xl-3 col-lg-3 col-md-6">
+    <div class="input-group bg-light rounded-3 shadow-sm border">
+        <span class="input-group-text bg-transparent border-0 text-muted ps-3">
+            <i class="bi bi-search"></i>
+        </span>
+        <InputText @bind-Value="newTask.Title" 
+                   class="form-control border-0 bg-transparent ps-1 py-2" 
+                   style="box-shadow: none !important; outline: none !important; background-color: transparent !important;" 
+                   placeholder="Task Title" 
+                   required />
+    </div>
+</div>
+
+                <!-- Assignee Select Dropdown -->
+                <div class="col-xl-3 col-lg-3 col-md-6">
+                    <div class="input-group bg-light rounded-3 shadow-sm border">
+                        <span class="input-group-text bg-transparent border-0 text-muted ps-3"><i class="bi bi-person"></i></span>
+                        <select @bind="selectedUserIdString" class="form-select border-0 shadow-none bg-transparent ps-1 py-2">
+                            <option value="0">Select Assignee</option>
+                            @foreach (var user in registeredUsers)
+                            {
+                                <option value="@user.Id">@(!string.IsNullOrWhiteSpace(user.Name) ? user.Name : user.Email)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Deadline Datepicker -->
+                <div class="col-xl-2 col-lg-2 col-md-6">
+                    <div class="input-group bg-light rounded-3 shadow-sm border px-1">
+                        <input type="date"
+                               value="@newTask.Deadline.ToString("yyyy-MM-dd")"
+                               @onchange="@(e => newTask.Deadline = DateTime.TryParse(e.Value?.ToString(), out var d) ? d : newTask.Deadline)"
+                               class="form-control border-0 shadow-none bg-transparent py-2" style="font-size: 0.85rem;" />
+                    </div>
+                </div>
+
+                <!-- Status Select -->
+                <div class="col-xl-2 col-lg-2 col-md-6">
+                    <div class="input-group bg-light rounded-3 shadow-sm border">
+                        <span class="input-group-text bg-transparent border-0 text-muted ps-2"><i class="bi bi-flag"></i></span>
+                        <InputSelect @bind-Value="newTask.Status" class="form-select border-0 shadow-none bg-transparent ps-1 py-2">
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                        </InputSelect>
+                    </div>
+                </div>
+
+                <!-- Assign Task Button -->
+                <div class="col-xl-2 col-lg-2 col-md-12">
+                    <button type="submit" class="btn text-white rounded-3 w-100 py-2 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-1" style="background-color: #0d3b66;">
+                        <i class="bi bi-plus-lg"></i> Assign Task
+                    </button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+
+    <!-- All Tasks Section Card -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+        <!-- Table Header Toolbar (Search on Left, Roles on Right) -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
+            <div>
+                <h5 class="fw-bold text-dark mb-1">All Tasks</h5>
+                <p class="text-muted small mb-0">View, manage and track all assigned tasks across the system.</p>
+            </div>
+            
+            <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-end">
+                <!-- Search filter input on the Left -->
+                <div class="input-group input-group-sm bg-light rounded-3 border" style="width: 180px;">
+                    <span class="input-group-text bg-transparent border-0"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control border-0 bg-transparent shadow-none" placeholder="Search" @bind="searchTerm" @bind:event="oninput" />
+                </div>
+                <!-- Filter icon button -->
+                <button class="btn btn-light btn-sm border px-2 text-secondary rounded-3"><i class="bi bi-filter"></i></button>
+                <!-- Role Filter Dropdown on the Right with Admin/User options -->
+                <div class="input-group input-group-sm bg-light rounded-3 border" style="width: 150px;">
+                    <span class="input-group-text bg-transparent border-0"><i class="bi bi-person-badge"></i></span>
+                    <select class="form-select form-select-sm border-0 bg-transparent shadow-none" @bind="selectedRoleFilter">
+                        <option value="All">All Roles</option>
+                        <option value="Admin">Admin</option>
+                        <option value="User">User</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr class="text-secondary border-bottom small">
+                        <th class="py-3" style="width: 60px;">#</th>
+                        <th class="py-3">Task Title</th>
+                        <th class="py-3">Assigned To</th>
+                        <th class="py-3">Deadline</th>
+                        <th class="py-3">Status</th>
+                        <th class="py-3 text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (PagedTasks == null || !PagedTasks.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">No tasks found.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        int index = (currentPage - 1) * pageSize + 1;
+                        @foreach (var task in PagedTasks)
+                        {
+                            var assignedUser = registeredUsers.FirstOrDefault(u => u.Id == task.UserId);
+                            <tr>
+                                <td class="text-muted fw-semibold">@index</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="rounded-circle p-2 bg-light text-primary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                            <i class="bi @GetTaskIcon(task.Title) small"></i>
+                                        </span>
+                                        <span class="fw-semibold text-dark">@task.Title</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (assignedUser != null)
+                                    {
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="rounded-circle text-white fw-bold d-flex align-items-center justify-content-center small" style="width: 28px; height: 28px; background-color: #0d3b66; font-size: 0.75rem;">
+                                                @GetInitials(assignedUser.Name ?? assignedUser.Email)
+                                            </span>
+                                            <span class="text-dark small">@(!string.IsNullOrWhiteSpace(assignedUser.Name) ? assignedUser.Name : assignedUser.Email)</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="rounded-circle text-muted bg-light fw-bold d-flex align-items-center justify-content-center small" style="width: 28px; height: 28px; font-size: 0.75rem;">U</span>
+                                            <span class="text-muted small">Unassigned</span>
+                                        </div>
+                                    }
+                                </td>
+                                <td class="text-muted small">
+                                    <i class="bi bi-calendar3 me-1"></i> @task.Deadline.ToString("M/d/yyyy")
+                                </td>
+                                <td>
+                                    <span class="badge px-3 py-2 rounded-pill fw-semibold @GetStatusBadgeClass(task.Status)">
+                                        @task.Status
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 me-1 fw-semibold shadow-sm" @onclick="() => OpenEditModal(task)">
+                                        <i class="bi bi-pencil-square me-1"></i> Edit
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-semibold shadow-sm" @onclick="() => DeleteTaskWithConfirmation(task.Id, task.Title)">
+                                        <i class="bi bi-trash me-1"></i> Delete
+                                    </button>
+                                    <button type="button" class="btn btn-light btn-sm rounded-circle text-secondary ms-1 shadow-none" style="width: 30px; height: 30px;">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            index++;
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Footer -->
+        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top small text-muted">
+            <div>Showing @GetDisplayRange() of @(FilteredTasks?.Count() ?? 0) tasks</div>
+            <div class="d-flex align-items-center gap-1">
+                <button class="btn btn-outline-secondary btn-sm px-3 rounded-pill bg-white text-dark border shadow-sm" 
+                        @onclick="() => ChangePage(currentPage - 1)" 
+                        disabled="@(currentPage == 1)">
+                    Previous
+                </button>
+                
+                @for (int i = 1; i <= TotalPages; i++)
+                {
+                    int pageNum = i;
+                    if (pageNum == currentPage)
+                    {
+                        <button class="btn btn-sm px-3 rounded-pill text-white fw-bold shadow-sm border-0" style="background-color: #0d3b66;">
+                            @pageNum
+                        </button>
+                    }
+                }
+
+                <button class="btn btn-outline-secondary btn-sm px-3 rounded-pill bg-white text-dark border shadow-sm" 
+                        @onclick="() => ChangePage(currentPage + 1)" 
+                        disabled="@(currentPage == TotalPages || TotalPages == 0)">
+                    Next
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Task Modal Overlay -->
+@if (isEditModalOpen && editingTask != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 p-3">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark">Edit Task</h5>
+                    <button type="button" class="btn-close shadow-none" @onclick="CloseEditModal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <EditForm Model="@editingTask" OnValidSubmit="HandleUpdateTask">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small text-secondary">Task Title *</label>
+                            <InputText @bind-Value="editingTask.Title" class="form-control rounded-3 shadow-none" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small text-secondary">Assigned User</label>
+                            <select @bind="editSelectedUserIdString" class="form-select rounded-3 shadow-none bg-white">
+                                @foreach (var user in registeredUsers)
+                                {
+                                    <option value="@user.Id">@(!string.IsNullOrWhiteSpace(user.Name) ? user.Name : user.Email)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small text-secondary">Deadline</label>
+                            <input type="date"
+                                   value="@editingTask.Deadline.ToString("yyyy-MM-dd")"
+                                   @onchange="@(e => editingTask.Deadline = DateTime.TryParse(e.Value?.ToString(), out var d) ? d : editingTask.Deadline)"
+                                   class="form-control rounded-3 shadow-none" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold small text-secondary">Status</label>
+                            <InputSelect @bind-Value="editingTask.Status" class="form-select rounded-3 shadow-none bg-white">
+                                <option value="Pending">Pending</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                            </InputSelect>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-light rounded-pill px-4 fw-semibold" @onclick="CloseEditModal">
+                                Cancel
+                            </button>
+                            <button type="submit" class="btn text-white rounded-pill px-4 fw-semibold" style="background-color: #0d3b66;">
+                                Save Changes
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private todolist.Models.TaskItem newTask = new todolist.Models.TaskItem { Deadline = DateTime.Today, Status = "Pending" };
+    private string selectedUserIdString = "0";
+    private List<todolist.Models.User> registeredUsers = new();
+    private List<todolist.Models.TaskItem> globalTasks = new();
+    private string searchTerm = string.Empty;
+    private string selectedRoleFilter = "All";
+
+    private int currentPage = 1;
+    private int pageSize = 5;
+
+    private bool isEditModalOpen = false;
+    private todolist.Models.TaskItem? editingTask;
+    private string editSelectedUserIdString = "0";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        registeredUsers = await UserService.GetAllUsersAsync() ?? new();
+        globalTasks = await TaskService.GetAllTasksAsync() ?? new();
+    }
+
+    private IEnumerable<todolist.Models.TaskItem> FilteredTasks
+    {
+        get {
+            var filtered = globalTasks.AsEnumerable();
+
+            // Search filter by task title or assigned user name/email
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filtered = filtered.Where(t =>
+                {
+                    var user = registeredUsers.FirstOrDefault(u => u.Id == t.UserId);
+                    var userName = user?.Name ?? string.Empty;
+                    var userEmail = user?.Email ?? string.Empty;
+
+                    return t.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                           userName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                           userEmail.Contains(searchTerm, StringComparison.OrdinalIgnoreCase);
+                });
+            }
+
+            // Filter by user role if requested
+            if (!string.Equals(selectedRoleFilter, "All", StringComparison.OrdinalIgnoreCase))
+            {
+                filtered = filtered.Where(t =>
+                {
+                    var user = registeredUsers.FirstOrDefault(u => u.Id == t.UserId);
+                    return user != null && string.Equals(user.Role, selectedRoleFilter, StringComparison.OrdinalIgnoreCase);
+                });
+            }
+
+            return filtered;
+        }
+    }
+
+    private IEnumerable<todolist.Models.TaskItem> PagedTasks
+    {
+        get {
+            return FilteredTasks
+                .Skip((currentPage - 1) * pageSize)
+                .Take(pageSize);
+        }
+    }
+
+    private int TotalPages => (int)Math.Ceiling((double)FilteredTasks.Count() / pageSize);
+
+    private async Task HandleCreateTask()
+    {
+        if (int.TryParse(selectedUserIdString, out int userId) && userId > 0)
+        {
+            newTask.UserId = userId;
+            await TaskService.CreateTaskAsync(newTask);
+
+            // Reset Form State
+            newTask = new todolist.Models.TaskItem { Deadline = DateTime.Today, Status = "Pending" };
+            selectedUserIdString = "0";
+
+            await LoadDataAsync();
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Please select a valid user to assign the task.");
+        }
+    }
+
+    private void OpenEditModal(todolist.Models.TaskItem task)
+    {
+        editingTask = new todolist.Models.TaskItem
+        {
+            Id = task.Id,
+            Title = task.Title,
+            UserId = task.UserId,
+            Deadline = task.Deadline,
+            Status = task.Status
+        };
+        editSelectedUserIdString = task.UserId.ToString();
+        isEditModalOpen = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalOpen = false;
+        editingTask = null;
+    }
+
+    private async Task HandleUpdateTask()
+    {
+        if (editingTask != null)
+        {
+            if (int.TryParse(editSelectedUserIdString, out int userId))
+            {
+                editingTask.UserId = userId;
+            }
+
+            await TaskService.UpdateTaskAsync(editingTask);
+            CloseEditModal();
+            await LoadDataAsync();
+        }
+    }
+
+    private async Task DeleteTaskWithConfirmation(int taskId, string title)
+    {
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the task '{title}'?");
+        if (confirmed)
+        {
+            await TaskService.DeleteTaskAsync(taskId);
+            await LoadDataAsync();
+        }
+    }
+
+    private void ChangePage(int page)
+    {
+        if (page >= 1 && page <= TotalPages)
+        {
+            currentPage = page;
+        }
+    }
+
+    private string GetDisplayRange()
+    {
+        int totalCount = FilteredTasks.Count();
+        if (totalCount == 0) return "0";
+
+        int start = (currentPage - 1) * pageSize + 1;
+        int end = Math.Min(currentPage * pageSize, totalCount);
+        return $"{start}-{end}";
+    }
+
+    private string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "U";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0][0].ToString().ToUpper();
+        return $"{parts[0][0]}{parts[parts.Length - 1][0]}".ToUpper();
+    }
+
+    private string GetStatusBadgeClass(string? status)
+    {
+        return status?.ToLower() switch
+        {
+            "completed" => "bg-success bg-opacity-10 text-success border border-success border-opacity-25",
+            "in progress" => "bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25",
+            _ => "bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25"
+        };
+    }
+
+    private string GetTaskIcon(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return "bi-journal-check";
+        var lower = title.ToLower();
+        if (lower.Contains("bug") || lower.Contains("fix")) return "bi-bug";
+        if (lower.Contains("design") || lower.Contains("ui")) return "bi-palette";
+        if (lower.Contains("report") || lower.Contains("data")) return "bi-bar-chart";
+        return "bi-journal-check";
+    }
+}

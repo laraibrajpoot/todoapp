@@ -1,0 +1,12 @@
+﻿# Build & Compiled Binaries
+bin/
+obj/
+.vs/
+*.user
+
+# User Uploads (prevents uploading user profile pictures to GitHub)
+wwwroot/uploads/*
+!wwwroot/uploads/.gitkeep
+
+# Local App Settings / Connection Strings with sensitive data
+appsettings.Development.json

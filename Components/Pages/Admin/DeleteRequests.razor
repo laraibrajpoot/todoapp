@@ -1,0 +1,90 @@
+﻿@page "/admin/delete-requests"
+@using todolist.Models
+@using todolist.Services
+@inject NotificationService NotificationService
+@inject TaskService TaskService
+@attribute [Authorize(Roles = "Admin")]
+
+<h3>Pending Task Deletion Requests</h3>
+
+@if (requests == null)
+{
+    <p><em>Loading requests...</em></p>
+}
+else if (!requests.Any())
+{
+    <p>No pending deletion requests.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Task Title</th>
+                <th>Requested By</th>
+                <th>Requested At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var req in requests)
+            {
+                <tr>
+                    <td>@req.TaskTitle</td>
+                    <td>@req.RequestedBy</td>
+                    <td>@req.RequestedAt.ToString("g")</td>
+                    <td>
+                        <button class="btn btn-success btn-sm me-2" @onclick="() => ApproveRequestAsync(req)">Approve</button>
+                        <button class="btn btn-danger btn-sm" @onclick="() => DenyRequestAsync(req)">Deny</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<TaskDeletionRequestModel>? requests;
+
+    protected override async Task OnInitializedAsync()
+    {
+        requests = await NotificationService.GetPendingDeletionRequestsAsync();
+    }
+
+    private async Task ApproveRequestAsync(TaskDeletionRequestModel request)
+    {
+        // 1. Delete the task
+        await TaskService.DeleteTaskAsync(request.TaskId);
+
+        // 2. Create approval notification for user
+        await NotificationService.CreateNotificationAsync(
+            userId: request.UserId,
+            title: "Deletion Request Approved",
+            message: $"Your deletion request for '{request.TaskTitle}' has been approved.",
+            url: "/user/tasks"
+        );
+
+        // 3. Resolve and clean up the request in DB
+        await NotificationService.ResolveDeletionRequestAsync(request.Id);
+
+        // 4. Update UI list
+        requests?.Remove(request);
+    }
+
+    private async Task DenyRequestAsync(TaskDeletionRequestModel request)
+    {
+        // 1. Create denial notification for user
+        await NotificationService.CreateNotificationAsync(
+            userId: request.UserId,
+            title: "Deletion Request Denied",
+            message: $"Your deletion request for '{request.TaskTitle}' has been denied.",
+            url: "/user/tasks"
+        );
+
+        // 2. Resolve and clean up the request in DB
+        await NotificationService.ResolveDeletionRequestAsync(request.Id);
+
+        // 3. Update UI list
+        requests?.Remove(request);
+    }
+}

@@ -1,0 +1,602 @@
+﻿@page "/user/tasks"
+@layout todolist.Components.Layout.UserLayout
+@using todolist.Models
+@using todolist.Services
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@inject TaskService TaskService
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject AiService AiService
+@rendermode InteractiveServer
+
+<style>
+    /* CSS Variables for Layout Spacing */
+    :root {
+        --sidebar-width: 260px;
+        --topbar-height: 64px;
+        --page-gap: 24px;
+    }
+
+    /* Fixed AI Guide Overlay Centered within Main Content */
+    .ai-guide-overlay {
+        position: fixed;
+        top: calc(var(--topbar-height) + 16px);
+        left: calc(var(--sidebar-width) + var(--page-gap));
+        right: var(--page-gap);
+        margin: 0 auto;
+        max-width: 900px;
+        width: calc(100% - var(--sidebar-width) - (var(--page-gap) * 2));
+        z-index: 2000;
+        box-shadow: 0 6px 30px rgba(0, 0, 0, 0.25);
+        border-radius: 12px;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    /* Escaped @@media so Razor treats it as CSS */
+    @@media (max-width: 768px) {
+        .ai-guide-overlay {
+            left: var(--page-gap);
+            width: calc(100% - (var(--page-gap) * 2));
+        }
+    }
+</style>
+
+<div class="px-4 py-3 position-relative" style="min-height: 85vh; padding-bottom: 80px !important;">
+    <!-- AI Guide Overlay Container (Rendered directly in main content) -->
+    @if (isAiModalOpen)
+    {
+        <div class="modal-backdrop fade show" style="z-index: 1999; background-color: rgba(0,0,0,0.4);" @onclick="CloseAiModal"></div>
+        <div class="ai-guide-overlay border-0">
+            <!-- Header -->
+            <div class="py-3 px-4 bg-primary text-white d-flex align-items-center justify-content-between">
+                <h5 class="fw-bold m-0 d-flex align-items-center gap-2" style="font-size: 1.1rem;">
+                    <span>🤖</span> AI Task Guide: <span class="fw-semibold text-white-50">@activeAiTaskTitle</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white shadow-none" @onclick="CloseAiModal"></button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-4 bg-white" style="max-height: 65vh; overflow-y: auto;">
+                @if (isGeneratingAi)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+                        <p class="text-muted fw-medium fs-6">Gemini is analyzing your task and building a custom guide...</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="ai-guide-content text-dark" style="line-height: 1.6; font-size: 0.95rem;">
+                        @((MarkupString)formattedAiContent)
+                    </div>
+                }
+            </div>
+
+            <!-- Footer -->
+            <div class="border-top bg-light py-3 px-4 text-end">
+                <button type="button" class="btn btn-secondary px-4 rounded-3 shadow-sm" @onclick="CloseAiModal">Close</button>
+            </div>
+        </div>
+    }
+
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-3 p-2 bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; font-size: 1.25rem;">
+                📋
+            </div>
+            <div>
+                <h2 class="fw-bold m-0" style="color: #1a1a1a; font-size: 1.5rem;">My Assigned Tasks</h2>
+                <p class="text-muted m-0 mt-1" style="font-size: 0.9rem;">Manage and track your assigned work</p>
+            </div>
+        </div>
+        <button type="button" class="btn text-white px-4 py-2 fw-semibold shadow-sm" style="background-color: #2563eb; border-radius: 8px;" @onclick="OpenAddModal">
+            + Add Task
+        </button>
+    </div>
+
+    <!-- Notification Toast Popup -->
+    @if (!string.IsNullOrEmpty(successNotification))
+    {
+        <div class="alert alert-info alert-dismissible fade show shadow-sm rounded-3 mb-4" role="alert">
+            <div class="d-flex align-items-center gap-2">
+                <span>🔔</span>
+                <span>@successNotification</span>
+            </div>
+            <button type="button" class="btn-close" @onclick="() => successNotification = string.Empty"></button>
+        </div>
+    }
+
+    <!-- Search and Filter Bar -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-8">
+            <div class="input-group bg-white rounded-3 shadow-sm border" style="overflow: hidden;">
+                <span class="input-group-text bg-white border-0 ps-3 text-muted">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
+                    </svg>
+                </span>
+                <input type="text" class="form-control border-0 shadow-none py-2" placeholder="Search tasks..." @bind="searchTerm" @bind:event="oninput" />
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="input-group bg-white rounded-3 shadow-sm border">
+                <span class="input-group-text bg-white border-0 text-muted ps-3">🔍</span>
+                <select class="form-select bg-white border-0 shadow-none py-2" @bind="selectedStatusFilter">
+                    <option value="All Status">All Status</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metric Summary Cards -->
+    <div class="row g-3 mb-4">
+        <!-- All Tasks -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-primary bg-opacity-10">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-primary small fw-semibold">All Tasks</div>
+                        <h3 class="fw-bold m-0 mt-1 text-dark">@userTasks.Count</h3>
+                        <div class="text-muted small mt-1">Total assigned tasks</div>
+                    </div>
+                    <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px; font-size: 1rem;">
+                        ➔
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Pending -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-danger bg-opacity-10">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-danger small fw-semibold">Pending</div>
+                        <h3 class="fw-bold m-0 mt-1 text-dark">@userTasks.Count(t => t.Status == "Pending")</h3>
+                        <div class="text-muted small mt-1">To be completed</div>
+                    </div>
+                    <div class="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px; font-size: 1rem;">
+                        ➔
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- In Progress -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-warning bg-opacity-15">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-warning-emphasis small fw-semibold">In Progress</div>
+                        <h3 class="fw-bold m-0 mt-1 text-dark">@userTasks.Count(t => t.Status == "In Progress")</h3>
+                        <div class="text-muted small mt-1">Currently working</div>
+                    </div>
+                    <div class="rounded-circle bg-white text-warning d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px; font-size: 1rem;">
+                        ➔
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Completed -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-success bg-opacity-10">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-success small fw-semibold">Completed</div>
+                        <h3 class="fw-bold m-0 mt-1 text-dark">@userTasks.Count(t => t.Status == "Completed")</h3>
+                        <div class="text-muted small mt-1">Great work!</div>
+                    </div>
+                    <div class="rounded-circle bg-white text-success d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px; font-size: 1rem;">
+                        ➔
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tasks Table Card -->
+    <div class="card border-0 shadow-sm rounded-4 bg-white">
+        <div class="card-header bg-white border-0 pt-4 px-4 pb-0 d-flex align-items-center gap-2">
+            <span style="font-size: 1.1rem;">📋</span>
+            <h5 class="fw-bold m-0" style="color: #1a1a1a;">Tasks</h5>
+        </div>
+        <div class="card-body px-4 py-3">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0 border-0">
+                    <thead>
+                        <tr class="text-muted border-bottom" style="font-size: 0.85rem;">
+                            <th class="border-0 pb-3 ps-0" style="width: 60px;">#</th>
+                            <th class="border-0 pb-3">Task Title</th>
+                            <th class="border-0 pb-3">Deadline</th>
+                            <th class="border-0 pb-3">Priority</th>
+                            <th class="border-0 pb-3">Status</th>
+                            <th class="border-0 pb-3 text-end pe-0">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (userTasks == null)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted border-0">Loading tasks...</td>
+                            </tr>
+                        }
+                        else if (!FilteredTasks.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted border-0">No matching tasks found.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            int index = 1;
+                            @foreach (var task in FilteredTasks)
+                            {
+                                <tr class="border-bottom border-light">
+                                    <td class="text-muted py-3 border-0 ps-0 fw-medium">@index</td>
+                                    <td class="py-3 border-0">
+                                        <span class="fw-bold text-dark text-decoration-underline" style="cursor: pointer;" @onclick="() => OpenViewModal(task)" title="Click to view details">
+                                            @task.Title
+                                        </span>
+                                    </td>
+                                    <td class="text-muted py-3 border-0">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span>📅</span>
+                                            <span>@task.Deadline.ToString("MMM d, yyyy")</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 border-0">
+                                        <span class="badge rounded-pill px-3 py-2 fw-medium
+                                            @(task.Priority == "High" ? "bg-danger bg-opacity-10 text-danger" :
+                                              task.Priority == "Medium" ? "bg-warning bg-opacity-20 text-warning-emphasis" :
+                                              "bg-info bg-opacity-10 text-info")">
+                                            ● @(string.IsNullOrEmpty(task.Priority) ? "Medium" : task.Priority)
+                                        </span>
+                                    </td>
+                                    <td class="py-3 border-0">
+                                        <select class="form-select form-select-sm border-0 rounded-pill ps-3 pe-4 py-1 fw-medium
+                                            @(task.Status == "Completed" ? "bg-success bg-opacity-10 text-success" :
+                                              task.Status == "In Progress" ? "bg-warning bg-opacity-20 text-warning-emphasis" :
+                                              "bg-secondary bg-opacity-10 text-secondary")"
+                                                style="width: 130px; cursor: pointer;"
+                                                value="@task.Status"
+                                                @onchange="@(e => UpdateStatusAsync(task, e.Value?.ToString()))">
+                                            <option value="Pending" class="bg-white text-dark">Pending</option>
+                                            <option value="In Progress" class="bg-white text-dark">In Progress</option>
+                                            <option value="Completed" class="bg-white text-dark">Completed</option>
+                                        </select>
+                                    </td>
+                                    <td class="text-end py-3 border-0 pe-0">
+                                        <div class="d-flex justify-content-end gap-1">
+                                            <button type="button" class="btn btn-sm btn-light border px-2 py-1 rounded-2 text-info" title="Generate AI Guide" @onclick="() => OpenAiGuideModal(task)">
+                                                🤖 AI Guide
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-light border px-2 py-1 rounded-2 text-primary" title="Edit Task" @onclick="() => OpenEditModal(task)">
+                                                ✏️ Edit
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-light border px-2 py-1 rounded-2 text-danger" title="Request Delete" @onclick="() => RequestTaskDeletion(task)">
+                                                🗑️ Delete
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                index++;
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Task Modal -->
+@if (isModalOpen && !isViewMode)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0 pt-4 px-4">
+                    <h5 class="modal-title fw-bold">@(isEditMode ? "Edit Task" : "Add New Task")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <EditForm Model="activeTask" OnValidSubmit="SaveTaskAsync">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body py-3 px-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small text-muted">Task Title</label>
+                            <InputText class="form-control rounded-3" @bind-Value="activeTask.Title" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small text-muted">Deadline</label>
+                            <InputDate class="form-control rounded-3" @bind-Value="activeTask.Deadline" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small text-muted">Priority</label>
+                            <InputSelect class="form-select rounded-3" @bind-Value="activeTask.Priority">
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                            </InputSelect>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small text-muted">Status</label>
+                            <InputSelect class="form-select rounded-3" @bind-Value="activeTask.Status">
+                                <option value="Pending">Pending</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                            </InputSelect>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                        <button type="button" class="btn btn-light px-4 rounded-3" @onclick="CloseModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary px-4 rounded-3" style="background-color: #2563eb;">Save Task</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- View Task Details Modal (Read-Only) -->
+@if (isModalOpen && isViewMode)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0 pt-4 px-4">
+                    <h5 class="modal-title fw-bold">Task Details</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body py-3 px-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted">Task Title</label>
+                        <p class="form-control-plaintext fw-bold text-dark bg-light px-3 py-2 rounded-3">@activeTask.Title</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted">Deadline</label>
+                        <p class="form-control-plaintext text-dark bg-light px-3 py-2 rounded-3">@activeTask.Deadline.ToString("MMMM d, yyyy")</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted">Priority</label>
+                        <p class="form-control-plaintext text-dark bg-light px-3 py-2 rounded-3">@activeTask.Priority</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted">Status</label>
+                        <p class="form-control-plaintext text-dark bg-light px-3 py-2 rounded-3">@activeTask.Status</p>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-secondary px-4 rounded-3" @onclick="CloseModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<TaskItem> userTasks = new();
+    private TaskItem activeTask = new();
+    private bool isModalOpen = false;
+    private bool isViewMode = false;
+    private bool isEditMode = false;
+    private int currentUserId = 0;
+    private string searchTerm = "";
+    private string selectedStatusFilter = "All Status";
+    private string successNotification = "";
+
+    // AI Guide State Variables
+    private bool isAiModalOpen = false;
+    private bool isGeneratingAi = false;
+    private string aiGeneratedContent = "";
+    private string formattedAiContent = "";
+    private string activeAiTaskTitle = "";
+
+    private IEnumerable<TaskItem> FilteredTasks => userTasks
+        .Where(t => (string.IsNullOrWhiteSpace(searchTerm) ||
+                     (t.Title?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                     (t.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)) &&
+                    (selectedStatusFilter == "All Status" || t.Status == selectedStatusFilter));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserTasksAsync();
+    }
+
+    private async Task LoadUserTasksAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is { IsAuthenticated: true })
+        {
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (int.TryParse(userIdClaim, out currentUserId))
+            {
+                var allTasks = await TaskService.GetAllTasksAsync();
+                userTasks = allTasks
+                    .Where(t => t.UserId == currentUserId)
+                    .ToList();
+            }
+        }
+    }
+
+    private void OpenAddModal()
+    {
+        isViewMode = false;
+        isEditMode = false;
+        activeTask = new TaskItem
+        {
+            Deadline = DateTime.Today.AddDays(1),
+            Priority = "Medium",
+            Status = "Pending",
+            UserId = currentUserId
+        };
+        isModalOpen = true;
+    }
+
+    private void OpenEditModal(TaskItem task)
+    {
+        isViewMode = false;
+        isEditMode = true;
+        activeTask = new TaskItem
+        {
+            Id = task.Id,
+            Title = task.Title,
+            Description = task.Description,
+            Deadline = task.Deadline,
+            Priority = task.Priority,
+            Status = task.Status,
+            UserId = task.UserId
+        };
+        isModalOpen = true;
+    }
+
+    private void OpenViewModal(TaskItem task)
+    {
+        isViewMode = true;
+        isEditMode = false;
+        activeTask = new TaskItem
+        {
+            Id = task.Id,
+            Title = task.Title,
+            Description = task.Description,
+            Deadline = task.Deadline,
+            Priority = task.Priority,
+            Status = task.Status,
+            UserId = task.UserId
+        };
+        isModalOpen = true;
+    }
+
+    private void CloseModal()
+    {
+        isModalOpen = false;
+        isViewMode = false;
+        isEditMode = false;
+    }
+
+    private async Task SaveTaskAsync()
+    {
+        activeTask.UserId = currentUserId;
+
+        if (isEditMode)
+        {
+            await TaskService.UpdateTaskAsync(activeTask);
+            successNotification = "Task updated successfully!";
+        }
+        else
+        {
+            await TaskService.AddTaskAsync(activeTask, currentUserId);
+            successNotification = "New task created successfully!";
+        }
+
+        CloseModal();
+        await LoadUserTasksAsync();
+    }
+
+    private async Task UpdateStatusAsync(TaskItem task, string? newStatus)
+    {
+        if (!string.IsNullOrEmpty(newStatus) && task.Status != newStatus)
+        {
+            task.Status = newStatus;
+            await TaskService.UpdateTaskAsync(task);
+            await LoadUserTasksAsync();
+        }
+    }
+
+    private async Task RequestTaskDeletion(TaskItem task)
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userName = user.Identity?.Name ?? "Unknown User";
+
+        await NotificationService.CreateDeletionRequestAsync(new TaskDeletionRequestModel
+        {
+            TaskId = task.Id,
+            TaskTitle = task.Title,
+            UserName = userName,
+            UserId = currentUserId > 0 ? currentUserId : task.UserId,
+            RequestedAt = DateTime.Now
+        });
+
+        successNotification = $"Deletion request for '{task.Title}' submitted successfully. Waiting for admin approval.";
+    }
+
+    private async Task OpenAiGuideModal(TaskItem task)
+    {
+        activeAiTaskTitle = task.Title ?? "Task Guide";
+        aiGeneratedContent = string.Empty;
+        formattedAiContent = string.Empty;
+        isGeneratingAi = true;
+        isAiModalOpen = true;
+
+        StateHasChanged();
+
+        try
+        {
+            aiGeneratedContent = await AiService.GenerateTaskGuideAsync(task.Title ?? string.Empty);
+            formattedAiContent = FormatMarkdownToHtml(aiGeneratedContent);
+        }
+        catch (Exception)
+        {
+            formattedAiContent = @"
+                <div class='alert alert-warning border-0 rounded-3 p-3'>
+                    <h6 class='fw-bold mb-1'>⚠️ AI Guide temporarily unavailable</h6>
+                    <p class='small m-0 text-muted'>The AI service experienced an error or high demand. Please try again shortly.</p>
+                </div>";
+        }
+        finally
+        {
+            isGeneratingAi = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CloseAiModal()
+    {
+        isAiModalOpen = false;
+        isGeneratingAi = false;
+    }
+
+    private string FormatMarkdownToHtml(string markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown)) return string.Empty;
+
+        // Remove horizontal lines
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^---$", "", System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        // Convert headers
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^#### (.*?)$", "<h6 class='fw-bold text-dark mt-3 mb-1'>$1</h6>", System.Text.RegularExpressions.RegexOptions.Multiline);
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^### (.*?)$", "<h5 class='fw-bold text-primary mt-3 mb-2'>$1</h5>", System.Text.RegularExpressions.RegexOptions.Multiline);
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^## (.*?)$", "<h5 class='fw-bold text-primary mt-3 mb-2'>$1</h5>", System.Text.RegularExpressions.RegexOptions.Multiline);
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^# (.*?)$", "<h4 class='fw-bold text-primary mt-3 mb-2'>$1</h4>", System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        // Convert bold syntax
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"\*\*(.*?)\*\*", "<strong>$1</strong>");
+
+        // Convert bullet points
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^\s*[\*\-] (.*?)$", "<li class='mb-1'>$1</li>", System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        // Wrap contiguous li items into a styled <ul> block
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"(<li.*?>.*?</li>\s*)+", "<ul class='ps-3 mb-2'>$&</ul>");
+
+        // Normalize multiple line breaks
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"\n{3,}", "\n\n");
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"\n", "<br />");
+
+        // Clean up unnecessary breaks after block elements
+        markdown = markdown.Replace("</ul><br />", "</ul>")
+                           .Replace("</h5><br />", "</h5>")
+                           .Replace("</h6><br />", "</h6>")
+                           .Replace("</h4><br />", "</h4>");
+
+        return markdown;
+    }
+}

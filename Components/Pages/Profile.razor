@@ -1,0 +1,397 @@
+@page "/user/profile"
+@layout UserLayout
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using todolist.Models
+@inject AuthenticationStateProvider AuthStateProvider
+@inject todolist.Services.UserService UserService
+@inject IJSRuntime JS
+
+<div class="px-4 py-3" style="min-height: 85vh; padding-bottom: 80px !important;">
+
+    <!-- Status Message Banner -->
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm rounded-3 mb-4" role="alert">
+            @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = string.Empty"></button>
+        </div>
+    }
+
+    <!-- Top Profile Banner Card -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 position-relative overflow-hidden" style="background: linear-gradient(135deg, #f0f4ff 0%, #e6efff 100%);">
+        <div class="d-flex flex-column flex-md-row align-items-center justify-between gap-4 position-relative" style="z-index: 2;">
+            <div class="d-flex align-items-center gap-3 text-center text-md-start flex-column flex-md-row">
+                <!-- Avatar with functional camera button and optional delete -->
+                <div class="position-relative">
+                    @if (!string.IsNullOrWhiteSpace(profileModel.ProfilePicture))
+                    {
+                        <img src="@profileModel.ProfilePicture" alt="Profile Picture" class="rounded-circle shadow object-fit-cover" style="width: 85px; height: 85px; border: 3px solid white;" />
+                    }
+                    else
+                    {
+                        <div class="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold shadow" style="width: 85px; height: 85px; background-color: #0d3b66; font-size: 2.2rem;">
+                            @GetUserInitial()
+                        </div>
+                    }
+
+                    <!-- Hidden File Input -->
+                    <InputFile id="userProfilePicUpload" OnChange="HandleImageUpload" class="d-none" accept=".png,.jpg,.jpeg" />
+
+                    <!-- Clickable Camera Badge -->
+                    <label for="userProfilePicUpload" class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle p-1 shadow-sm d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; font-size: 0.75rem; border: 2px solid white; cursor: pointer;" title="Change Profile Picture">
+                        📷
+                    </label>
+                </div>
+
+                <div>
+                    <h3 class="fw-bold mb-1" style="color: #1a1a1a;">@profileModel.FullName</h3>
+                    <div class="text-muted small d-flex align-items-center justify-content-center justify-content-md-start gap-1 mb-1">
+                        <span>✉️</span> @profileModel.Email
+                    </div>
+                    <div class="text-muted small d-flex align-items-center justify-content-center justify-content-md-start gap-1 mb-2">
+                        <span>🏢</span> @(string.IsNullOrEmpty(profileModel.Department) ? "No Department Assigned" : profileModel.Department)
+                    </div>
+
+                    <!-- Delete Photo Button Option -->
+                    @if (!string.IsNullOrWhiteSpace(profileModel.ProfilePicture))
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1 fw-semibold shadow-sm" style="font-size: 0.75rem;" @onclick="ConfirmAndDeletePhoto">
+                            🗑️ Remove Photo
+                        </button>
+                    }
+                </div>
+            </div>
+            <button type="button" class="btn @(isEditing ? "btn-secondary" : "btn-light") px-4 py-2 fw-semibold shadow-sm border rounded-pill text-dark d-flex align-items-center gap-2" @onclick="ToggleEditMode">
+                @(isEditing ? "❌ Cancel Editing" : "✏️ Edit Profile")
+            </button>
+        </div>
+    </div>
+
+    <!-- Two-Column Layout -->
+    <div class="row g-4">
+        <!-- Left Column: Personal Information Form -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <div class="d-flex align-items-center gap-2 mb-4">
+                    <span class="text-primary fs-5">👤</span>
+                    <h5 class="fw-bold m-0" style="color: #1a1a1a;">Personal Information</h5>
+                </div>
+
+                <EditForm Model="@profileModel" OnValidSubmit="UpdateProfile">
+                    <DataAnnotationsValidator />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted">Full Name</label>
+                        <div class="input-group bg-light rounded-3 border">
+                            <span class="input-group-text bg-transparent border-0 text-muted ps-3">👤</span>
+                            <InputText class="form-control bg-transparent border-0 shadow-none py-2" @bind-Value="profileModel.FullName" disabled="@(!isEditing)" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted">Email Address</label>
+                        <div class="input-group bg-light rounded-3 border">
+                            <span class="input-group-text bg-transparent border-0 text-muted ps-3">✉️</span>
+                            <InputText class="form-control bg-transparent border-0 shadow-none py-2 text-muted" @bind-Value="profileModel.Email" readonly style="background-color: #e9ecef !important;" />
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold small text-muted">Department</label>
+                        <div class="input-group bg-light rounded-3 border">
+                            <span class="input-group-text bg-transparent border-0 text-muted ps-3">🏢</span>
+                            <InputSelect class="form-select bg-transparent border-0 shadow-none py-2" @bind-Value="profileModel.Department" disabled="@(!isEditing)">
+                                <option value="">Select Department</option>
+                                <option value="Computer Science">Computer Science</option>
+                                <option value="Software Engineering">Software Engineering</option>
+                                <option value="Information Technology">Information Technology</option>
+                                <option value="Artificial Intelligence">Artificial Intelligence</option>
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    @if (isEditing)
+                    {
+                        <button type="submit" class="btn text-white px-4 py-2 fw-semibold shadow-sm" style="background-color: #0d3b66; border-radius: 8px;">
+                            💾 Save Changes
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="text-muted small fst-italic">Click "Edit Profile" above to make changes to your personal information.</div>
+                    }
+                </EditForm>
+            </div>
+        </div>
+
+        <!-- Right Column: Account Details & Profile Completion -->
+        <div class="col-lg-5 d-flex flex-column gap-4">
+            <!-- Account Details Card -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="text-primary fs-5">🛡️</span>
+                    <h5 class="fw-bold m-0" style="color: #1a1a1a;">Account Details</h5>
+                </div>
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                        <span class="text-muted small d-flex align-items-center gap-2">📅 Account Created</span>
+                        <span class="fw-semibold small text-dark">@profileModel.CreatedAt</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                        <span class="text-muted small d-flex align-items-center gap-2">🕒 Last Login</span>
+                        <span class="fw-semibold small text-dark">@profileModel.LastLogin</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small d-flex align-items-center gap-2">👤 Role</span>
+                        <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill fw-medium">@profileModel.Role</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Completion Card -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="text-primary fs-5">🔵</span>
+                    <h5 class="fw-bold m-0" style="color: #1a1a1a;">Profile Completion</h5>
+                </div>
+                <div class="row align-items-center g-3">
+                    <div class="col-4 text-center">
+                        <div class="position-relative d-inline-flex align-items-center justify-content-center">
+                            <div class="rounded-circle border border-primary border-4 d-flex align-items-center justify-content-center fw-bold text-primary" style="width: 70px; height: 70px; font-size: 1.1rem; border-color: #2563eb !important;">
+                                @CalculateCompletion()%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-8">
+                        <h6 class="fw-bold text-dark mb-1" style="font-size: 0.95rem;">
+                            @(CalculateCompletion() == 100 ? "All set!" : "Almost there!")
+                        </h6>
+                        <p class="text-muted small mb-2" style="font-size: 0.8rem; line-height: 1.2;">Complete your profile to get the best experience.</p>
+                    </div>
+                </div>
+                <div class="mt-3 pt-3 border-top d-flex flex-column gap-2">
+                    <div class="d-flex align-items-center justify-content-between small">
+                        <span class="text-dark d-flex align-items-center gap-2">
+                            @(!string.IsNullOrWhiteSpace(profileModel.FullName) ? "✅" : "⭕") Basic Information
+                        </span>
+                        <span class="@(!string.IsNullOrWhiteSpace(profileModel.FullName) ? "text-success fw-bold" : "text-muted")">
+                            @(!string.IsNullOrWhiteSpace(profileModel.FullName) ? "Done" : "Pending")
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between small">
+                        <span class="text-dark d-flex align-items-center gap-2">
+                            @(!string.IsNullOrWhiteSpace(profileModel.Department) ? "✅" : "⭕") Department
+                        </span>
+                        <span class="@(!string.IsNullOrWhiteSpace(profileModel.Department) ? "text-success fw-bold" : "text-muted")">
+                            @(!string.IsNullOrWhiteSpace(profileModel.Department) ? "Done" : "Pending")
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between small">
+                        <span class="text-dark d-flex align-items-center gap-2">
+                            @(!string.IsNullOrWhiteSpace(profileModel.ProfilePicture) ? "✅" : "⭕") Profile Photo
+                        </span>
+                        <span class="@(!string.IsNullOrWhiteSpace(profileModel.ProfilePicture) ? "text-success fw-bold" : "text-muted")">
+                            @(!string.IsNullOrWhiteSpace(profileModel.ProfilePicture) ? "Done" : "Pending")
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ProfileModel profileModel = new ProfileModel();
+    private string statusMessage = string.Empty;
+    private bool isEditing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is { IsAuthenticated: true })
+        {
+            var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                        ?? user.Identity.Name
+                        ?? string.Empty;
+
+            profileModel.Email = email;
+
+            var dbUser = await UserService.GetUserByEmailAsync(email);
+            if (dbUser != null)
+            {
+                profileModel.FullName = string.IsNullOrWhiteSpace(dbUser.Name)
+                    ? dbUser.Email.Split('@')[0]
+                    : dbUser.Name;
+
+                profileModel.Department = dbUser.Department ?? string.Empty;
+                profileModel.CreatedAt = dbUser.CreatedAt != default ? dbUser.CreatedAt.ToString("MMM yyyy") : "Aug 2025";
+                profileModel.LastLogin = "Today, " + DateTime.Now.ToString("h:mm tt");
+                profileModel.Role = dbUser.Role ?? "User";
+                profileModel.ProfilePicture = dbUser.ProfilePicture ?? string.Empty;
+            }
+            else
+            {
+                var nameClaim = user.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value
+                                ?? user.FindFirst("FullName")?.Value;
+
+                if (!string.IsNullOrEmpty(nameClaim))
+                {
+                    profileModel.FullName = nameClaim;
+                }
+                else if (!string.IsNullOrEmpty(email))
+                {
+                    var prefix = email.Split('@')[0];
+                    profileModel.FullName = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(prefix);
+                }
+                profileModel.CreatedAt = "Aug 2025";
+                profileModel.LastLogin = "Today, " + DateTime.Now.ToString("h:mm tt");
+                profileModel.Role = "User";
+            }
+        }
+    }
+
+    private void ToggleEditMode()
+    {
+        isEditing = !isEditing;
+        statusMessage = string.Empty;
+    }
+
+    private string GetUserInitial() =>
+        !string.IsNullOrWhiteSpace(profileModel.FullName) ? profileModel.FullName[0].ToString().ToUpper() : "U";
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        statusMessage = string.Empty;
+        var file = e.File;
+
+        if (file != null)
+        {
+            var maxAllowedSize = 2_097_152; // 2 MB
+            if (file.Size > maxAllowedSize)
+            {
+                statusMessage = "Image file is too large. Please select an image under 2 MB.";
+                return;
+            }
+
+            try
+            {
+                // 1. Define physical folder path inside wwwroot
+                var folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+
+                // 2. Optional: Delete old image file from disk if it exists
+                if (!string.IsNullOrWhiteSpace(profileModel.ProfilePicture) && profileModel.ProfilePicture.StartsWith("/uploads/"))
+                {
+                    var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", profileModel.ProfilePicture.TrimStart('/'));
+                    if (File.Exists(oldFilePath))
+                    {
+                        File.Delete(oldFilePath);
+                    }
+                }
+
+                // 3. Generate a unique file name to avoid collisions
+                var fileName = $"{Guid.NewGuid()}_{file.Name}";
+                var filePath = Path.Combine(folderPath, fileName);
+
+                // 4. Save the file to disk
+                using (var stream = file.OpenReadStream(maxAllowedSize))
+                using (var fs = new FileStream(filePath, FileMode.Create))
+                {
+                    await stream.CopyToAsync(fs);
+                }
+
+                // 5. Store relative web path in the model and database
+                var relativePath = $"/uploads/{fileName}";
+                profileModel.ProfilePicture = relativePath;
+
+                var dbUser = await UserService.GetUserByEmailAsync(profileModel.Email);
+                if (dbUser != null)
+                {
+                    dbUser.ProfilePicture = relativePath;
+                    await UserService.UpdateUserAsync(dbUser);
+                    statusMessage = "Profile picture updated successfully!";
+                }
+            }
+            catch (Exception ex)
+            {
+                statusMessage = $"Error uploading image: {ex.Message}";
+            }
+
+            StateHasChanged();
+        }
+    }
+    private async Task ConfirmAndDeletePhoto()
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", "Are you sure you want to remove your profile picture?");
+        if (confirmed)
+        {
+            // Delete physical file if stored in /uploads/
+            if (!string.IsNullOrWhiteSpace(profileModel.ProfilePicture) && profileModel.ProfilePicture.StartsWith("/uploads/"))
+            {
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", profileModel.ProfilePicture.TrimStart('/'));
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+            }
+
+            profileModel.ProfilePicture = string.Empty;
+
+            var dbUser = await UserService.GetUserByEmailAsync(profileModel.Email);
+            if (dbUser != null)
+            {
+                dbUser.ProfilePicture = null;
+                await UserService.UpdateUserAsync(dbUser);
+            }
+
+            statusMessage = "Profile picture removed successfully!";
+            StateHasChanged();
+        }
+    }
+
+    private int CalculateCompletion()
+    {
+        int completed = 0;
+        int total = 3;
+        if (!string.IsNullOrWhiteSpace(profileModel.FullName)) completed++;
+        if (!string.IsNullOrWhiteSpace(profileModel.Department)) completed++;
+        if (!string.IsNullOrWhiteSpace(profileModel.ProfilePicture)) completed++;
+        return (int)((double)completed / total * 100);
+    }
+
+    private async Task UpdateProfile()
+    {
+        var dbUser = await UserService.GetUserByEmailAsync(profileModel.Email);
+        if (dbUser != null)
+        {
+            dbUser.Name = profileModel.FullName;
+            dbUser.Department = string.IsNullOrWhiteSpace(profileModel.Department) ? null : profileModel.Department.Trim();
+
+            await UserService.UpdateUserAsync(dbUser);
+            statusMessage = "Profile updated successfully!";
+            isEditing = false;
+        }
+        else
+        {
+            statusMessage = "Unable to find user record to update.";
+        }
+    }
+
+    public class ProfileModel
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Department { get; set; } = string.Empty;
+        public string CreatedAt { get; set; } = "Aug 2025";
+        public string LastLogin { get; set; } = "Today";
+        public string Role { get; set; } = "User";
+        public string ProfilePicture { get; set; } = string.Empty;
+    }
+}

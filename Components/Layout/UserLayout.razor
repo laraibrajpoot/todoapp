@@ -1,0 +1,289 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthProvider
+@inject todolist.Services.NotificationService NotificationService
+@using System.Security.Claims
+@using todolist.Models
+
+<div class="user-layout" style="display: flex; flex-direction: column; height: 100vh; overflow: hidden;" @onclick="CloseAllDropdowns">
+
+    <!-- Fixed Top Header -->
+    <header class="top-bar" style="height: 64px; background: #0f172a; display: flex; justify-content: flex-end; align-items: center; padding: 0 24px; color: white; border-bottom: 1px solid rgba(255,255,255,0.1); gap: 16px;">
+
+        <!-- Functional Notification Bell with Dropdown & Badge -->
+        <div style="position: relative; display: inline-block;" @onclick:stopPropagation="true">
+            <button type="button" @onclick="ToggleNotifications" style="background: none; border: none; color: white; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.08); position: relative;">
+                🔔
+                @if (unreadNotificationCount > 0)
+                {
+                    <span style="position: absolute; top: -2px; right: -2px; background: #ef4444; color: white; font-size: 0.65rem; font-weight: bold; border-radius: 10px; padding: 2px 6px; min-width: 18px; text-align: center; border: 2px solid #0f172a;">
+                        @unreadNotificationCount
+                    </span>
+                }
+            </button>
+
+            @if (isNotificationsOpen)
+            {
+                <div style="position: absolute; right: 0; top: 46px; background: white; color: #1e293b; border-radius: 12px; box-shadow: 0 10px 25px -3px rgba(0,0,0,0.2); width: 320px; z-index: 9999; overflow: hidden; border: 1px solid #e2e8f0;">
+                    <div style="font-weight: 600; font-size: 0.9rem; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Notifications</span>
+                        @if (unreadNotificationCount > 0)
+                        {
+                            <span style="font-size: 0.75rem; background: #dbeafe; color: #2563eb; padding: 2px 8px; border-radius: 12px; font-weight: 600;">@unreadNotificationCount unread</span>
+                        }
+                    </div>
+
+                    <div style="max-height: 320px; overflow-y: auto;">
+                        @if (userNotifications == null || !userNotifications.Any())
+                        {
+                            <div style="background: #f8fafc; color: #64748b; padding: 16px; font-size: 0.85rem; text-align: center;">
+                                No notifications yet
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var note in userNotifications)
+                            {
+                                bool isApproved = note.Title.Contains("Approved", StringComparison.OrdinalIgnoreCase);
+                                <div @onclick="() => HandleNotificationClickAsync(note)" style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; align-items: start; gap: 10px; background-color: @(note.IsRead ? "#ffffff" : "#f0f9ff"); transition: background-color 0.2s;" class="dropdown-item-hover">
+                                    <span style="font-size: 1.1rem; line-height: 1;">
+                                        @(isApproved ? "✅" : "❌")
+                                    </span>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 0.85rem; color: #0f172a; margin-bottom: 2px;">@note.Title</div>
+                                        <div style="font-size: 0.8rem; color: #475569; line-height: 1.3;">@note.Message</div>
+                                        <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">@note.CreatedAt.ToString("g")</div>
+                                    </div>
+                                    @if (!note.IsRead)
+                                    {
+                                        <span style="width: 8px; height: 8px; background: #2563eb; border-radius: 50%; display: inline-block; margin-top: 4px;"></span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Profile Pill with Dropdown Menu -->
+        <div style="position: relative; display: inline-block;" @onclick:stopPropagation="true">
+            <div @onclick="ToggleDropdown" style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: rgba(255,255,255,0.08); padding: 4px 12px; border-radius: 20px;">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: #2563eb; display: flex; align-items: center; justify-content: center; overflow: hidden; color: white; font-weight: bold; font-size: 0.9rem;">
+                    @if (!string.IsNullOrEmpty(userProfileImageUrl))
+                    {
+                        <img src="@userProfileImageUrl" alt="Profile" style="width: 100%; height: 100%; object-fit: cover;" />
+                    }
+                    else
+                    {
+                        <span>@(string.IsNullOrEmpty(displayName) ? "U" : displayName.Substring(0, 1).ToUpper())</span>
+                    }
+                </div>
+                <span class="top-bar-user" style="color: white; font-size: 0.9rem; font-weight: 500;">@displayName</span>
+                <span style="color: #cbd5e1; font-size: 0.75rem;">▼</span>
+            </div>
+
+            <!-- Profile Dropdown Menu -->
+            @if (isDropdownOpen)
+            {
+                <div style="position: absolute; right: 0; top: 46px; background: white; color: #1e293b; border-radius: 12px; box-shadow: 0 10px 25px -3px rgba(0,0,0,0.2); width: 210px; z-index: 9999; overflow: hidden; border: 1px solid #e2e8f0; padding: 6px;">
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-radius: 8px;" class="dropdown-item-hover">
+                        <span>📷</span> Add/Change Picture
+                        <Microsoft.AspNetCore.Components.Forms.InputFile OnChange="HandleImageUpload" style="display: none;" />
+                    </label>
+
+                    <div @onclick="NavigateToProfile" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-radius: 8px;" class="dropdown-item-hover">
+                        <span>👤</span> View Profile
+                    </div>
+                </div>
+            }
+        </div>
+    </header>
+
+    <!-- Main Body Layout -->
+    <div class="main-body" style="display: flex; flex: 1; overflow: hidden;">
+
+        <!-- Fixed Left Sidebar -->
+        <aside class="sidebar" style="width: 260px; background: #0f172a; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid rgba(255,255,255,0.05);">
+
+            <div style="display: flex; flex-direction: column; flex-grow: 1; overflow-y: auto;">
+                <!-- Brand Header -->
+                <div class="sidebar-brand" style="display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.2rem; padding: 24px 20px 16px 20px; color: white;">
+                    <div style="width: 28px; height: 28px; background: #2563eb; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.9rem;">✓</div>
+                    TaskFlow
+                </div>
+
+                <!-- Nav Menu with Admin-Style Styling -->
+                <div class="custom-sidebar-nav" style="padding: 0 16px; display: flex; flex-direction: column; gap: 6px;">
+                    <NavLink href="/user/dashboard" Match="NavLinkMatch.All" class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2">
+                        <span style="font-size: 1.1rem;">🏠</span> Dashboard
+                    </NavLink>
+                    <NavLink href="/user/tasks" class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2">
+                        <span style="font-size: 1.1rem;">📋</span> Tasks
+                    </NavLink>
+                    <NavLink href="/user/calendar" class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2">
+                        <span style="font-size: 1.1rem;">📅</span> Calendar
+                    </NavLink>
+                    <NavLink href="/user/profile" class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2">
+                        <span style="font-size: 1.1rem;">👤</span> Profile
+                    </NavLink>
+                </div>
+            </div>
+
+            <!-- Logout Button -->
+            <div style="padding: 16px 20px; border-top: 1px solid rgba(255, 255, 255, 0.15); background-color: #0d3b66;">
+                <form action="/Account/Logout" method="post" style="display: block; margin: 0; width: 100%;">
+                    <button type="submit" class="btn-logout" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z" />
+                            <path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z" />
+                        </svg>
+                        Logout
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <!-- Scrollable Main Content -->
+        <main class="content-area" style="flex: 1; background: #f8fafc; overflow-y: auto; padding: 24px;">
+            @Body
+        </main>
+    </div>
+</div>
+
+<style>
+    .custom-sidebar-nav .nav-link {
+        color: rgba(255, 255, 255, 0.7) !important;
+        transition: all 0.2s ease-in-out;
+        text-decoration: none;
+    }
+
+        .custom-sidebar-nav .nav-link:hover {
+            color: #ffffff !important;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .custom-sidebar-nav .nav-link.active {
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+    .dropdown-item-hover:hover {
+        background: #f1f5f9 !important;
+    }
+</style>
+
+@code {
+    private string displayName = "User";
+    private string? userProfileImageUrl = null;
+    private bool isDropdownOpen = false;
+    private bool isNotificationsOpen = false;
+
+    private List<Notification> userNotifications = new();
+    private int unreadNotificationCount => userNotifications?.Count(n => !n.IsRead) ?? 0;
+    private int currentUserId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is { IsAuthenticated: true })
+        {
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                           ?? user.FindFirst("sub")?.Value
+                           ?? user.FindFirst("UserId")?.Value;
+
+            if (int.TryParse(userIdClaim, out currentUserId) && currentUserId > 0)
+            {
+                await LoadNotificationsAsync();
+            }
+
+            var email = user.FindFirst(ClaimTypes.Email)?.Value;
+            var nameClaim = user.FindFirst(ClaimTypes.Name)?.Value ?? email;
+
+            if (!string.IsNullOrEmpty(nameClaim))
+            {
+                displayName = nameClaim.Contains('@')
+                    ? System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(nameClaim.Split('@')[0])
+                    : nameClaim;
+            }
+        }
+    }
+
+    private async Task LoadNotificationsAsync()
+    {
+        if (currentUserId > 0)
+        {
+            userNotifications = await NotificationService.GetUserNotificationsAsync(currentUserId);
+        }
+    }
+
+    private async Task ToggleNotifications(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+    {
+        isNotificationsOpen = !isNotificationsOpen;
+        isDropdownOpen = false;
+
+        if (isNotificationsOpen)
+        {
+            await LoadNotificationsAsync();
+        }
+    }
+
+    private async Task HandleNotificationClickAsync(Notification note)
+    {
+        if (!note.IsRead)
+        {
+            await NotificationService.MarkAllAsReadForUserAsync(currentUserId);
+            await LoadNotificationsAsync();
+        }
+
+        Navigation.NavigateTo("/user/tasks");
+    }
+
+    private void ToggleDropdown(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+    {
+        isDropdownOpen = !isDropdownOpen;
+        isNotificationsOpen = false;
+    }
+
+    private void CloseAllDropdowns()
+    {
+        isDropdownOpen = false;
+        isNotificationsOpen = false;
+    }
+
+    private void NavigateToProfile()
+    {
+        isDropdownOpen = false;
+        Navigation.NavigateTo("/user/profile");
+    }
+
+    private async Task HandleImageUpload(Microsoft.AspNetCore.Components.Forms.InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            try
+            {
+                using var stream = file.OpenReadStream(maxAllowedSize: 5120000);
+                using var memoryStream = new MemoryStream();
+                await stream.CopyToAsync(memoryStream);
+
+                isDropdownOpen = false;
+
+                var format = "image/png";
+                var buffer = memoryStream.ToArray();
+                userProfileImageUrl = $"data:{format};base64,{Convert.ToBase64String(buffer)}";
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error uploading file: {ex.Message}");
+            }
+        }
+    }
+}

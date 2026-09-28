@@ -1,0 +1,186 @@
+﻿@using Microsoft.AspNetCore.SignalR.Client
+@using System.Security.Claims
+@inject NavigationManager Navigation
+@inject todolist.Services.NotificationService NotificationService
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthStateProvider
+@implements IAsyncDisposable
+
+<div style="position: relative; display: inline-block;">
+    <button type="button" @onclick="ToggleNotifications" style="background: rgba(255,255,255,0.08); border: none; color: white; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; position: relative;">
+        🔔
+        @if (unreadCount > 0)
+        {
+            <span style="position: absolute; top: -2px; right: -2px; background: #ef4444; color: white; font-size: 0.7rem; font-weight: bold; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;">
+                @unreadCount
+            </span>
+        }
+    </button>
+
+    @if (isOpen)
+    {
+        <div style="position: absolute; right: 0; top: 46px; background: white; color: #1e293b; border-radius: 12px; box-shadow: 0 10px 25px -3px rgba(0,0,0,0.2); width: 280px; z-index: 9999; overflow: hidden; border: 1px solid #e2e8f0; padding: 12px;">
+            <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span>Notifications</span>
+                @if (notifications.Any(n => !n.IsRead))
+                {
+                    <span style="font-size: 0.75rem; color: #2563eb; cursor: pointer;" @onclick="MarkAllAsRead">Mark all read</span>
+                }
+            </div>
+
+            <div style="max-height: 250px; overflow-y: auto;">
+                @if (notifications.Any())
+                {
+                    @foreach (var note in notifications)
+                    {
+                        <div @onclick="() => MarkSingleAsRead(note)" style="padding: 8px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; cursor: pointer; background: @(note.IsRead ? "transparent" : "#f0f9ff"); transition: background 0.2s ease;">
+                            <div style="font-weight: 600; color: #0f172a; display: flex; justify-content: space-between; align-items: center;">
+                                <span>@note.Title</span>
+                                @if (!note.IsRead)
+                                {
+                                    <span style="width: 6px; height: 6px; background: #2563eb; border-radius: 50%; display: inline-block;"></span>
+                                }
+                            </div>
+                            <div style="color: #64748b; font-size: 0.8rem; margin-top: 2px;">@note.Message</div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div style="background: #f8fafc; color: #64748b; padding: 10px; border-radius: 8px; font-size: 0.85rem; text-align: center;">
+                        No notifications yet
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int CurrentUserId { get; set; }
+
+    private bool isOpen = false;
+    private int unreadCount = 0;
+    private List<NotificationItemViewModel> notifications = new();
+    private HubConnection? hubConnection;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (CurrentUserId > 0 && !notifications.Any())
+        {
+            await LoadNotificationsAsync();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (CurrentUserId > 0)
+        {
+            await LoadNotificationsAsync();
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/notificationHub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<string, string>("ReceiveNotification", (title, message) =>
+        {
+            AddNotificationToList(title, message);
+        });
+
+        hubConnection.On<string, string>("ReceiveRequest", (title, message) =>
+        {
+            AddNotificationToList(title, message);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task LoadNotificationsAsync()
+    {
+        var dbNotes = await NotificationService.GetUserNotificationsAsync(CurrentUserId);
+        if (dbNotes != null)
+        {
+            notifications = dbNotes.Select(n => new NotificationItemViewModel
+            {
+                Id = n.Id,
+                Title = n.Title,
+                Message = n.Message,
+                IsRead = n.IsRead
+            }).ToList();
+
+            unreadCount = notifications.Count(n => !n.IsRead);
+            StateHasChanged();
+        }
+    }
+
+    private void AddNotificationToList(string title, string message)
+    {
+        notifications.Insert(0, new NotificationItemViewModel
+        {
+            Title = title,
+            Message = message,
+            IsRead = false
+        });
+        unreadCount++;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleNotifications()
+    {
+        isOpen = !isOpen;
+
+        // Auto-mark notifications as read when opening the menu dropdown
+        if (isOpen && unreadCount > 0)
+        {
+            await MarkAllAsRead();
+        }
+    }
+
+    private async Task MarkSingleAsRead(NotificationItemViewModel note)
+{
+    if (!note.IsRead)
+    {
+        note.IsRead = true;
+        if (unreadCount > 0) unreadCount--;
+
+        if (note.Id > 0)
+        {
+            await NotificationService.MarkNotificationAsReadAsync(note.Id);
+        }
+        StateHasChanged();
+    }
+}
+
+private async Task MarkAllAsRead()
+{
+    if (CurrentUserId > 0)
+    {
+        await NotificationService.MarkAllAsReadForUserAsync(CurrentUserId);
+    }
+
+    foreach (var note in notifications)
+    {
+        note.IsRead = true;
+    }
+
+    unreadCount = 0;
+    StateHasChanged();
+}
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+
+    public class NotificationItemViewModel
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public bool IsRead { get; set; }
+    }
+}

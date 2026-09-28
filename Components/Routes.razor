@@ -1,0 +1,19 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@rendermode InteractiveServer
+
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(todolist.Components.Layout.MainLayout)">
+            <NotAuthorized>
+                <p>You are not authorized to view this page.</p>
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="typeof(todolist.Components.Layout.MainLayout)">
+            <p role="alert">Sorry, there's nothing at this address.</p>
+        </LayoutView>
+    </NotFound>
+</Router>

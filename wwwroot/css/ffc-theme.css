@@ -1,0 +1,43 @@
+/* FFC-like theme colors and basic layout */
+:root{
+    --ffc-blue: #0a4c88;
+    --ffc-accent: #f6b21a;
+    --ffc-dark: #0b2b3a;
+    --ffc-light: #f8f9fb;
+    --ffc-muted: #6c757d;
+}
+
+body {
+    background: linear-gradient(180deg, var(--ffc-light) 0%, #ffffff 100%);
+    color: var(--ffc-dark);
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+.page { display:flex; min-height:100vh }
+.sidebar { width:260px; background:var(--ffc-blue); color:white; }
+main { flex:1; }
+
+.top-row { background: #ffffff; border-bottom: 1px solid #e6e6e6; }
+
+.navbar-brand { color: white; font-weight:700 }
+
+.content { padding: 1.5rem; }
+
+.ffc-card { background:white; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.07); padding:1rem; margin-bottom:1rem }
+.ffc-hero { background: linear-gradient(90deg,var(--ffc-blue), #0d6efd); color:white; padding:1rem; border-radius:6px }
+
+.ffc-btn { background:var(--ffc-accent); color:var(--ffc-dark); border:none; padding:0.5rem 0.9rem; border-radius:4px }
+.ffc-btn:hover{ opacity:0.95 }
+
+.task-list { list-style:none; padding:0; margin:0 }
+.task-item { display:flex; justify-content:space-between; padding:0.6rem; border-bottom:1px solid #f1f1f1 }
+.task-item .meta { color:var(--ffc-muted); font-size:0.9rem }
+.task-complete { text-decoration:line-through; color:#9aa0a6 }
+
+    .sidebar{ display:none }
+    .page{ flex-direction:column }
+}
+
+/* Small utilities */
+.muted{ color:var(--ffc-muted) }
+.mb-2{ margin-bottom:0.5rem }

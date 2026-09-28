@@ -1,0 +1,472 @@
+﻿@page "/user/calendar"
+@layout todolist.Components.Layout.UserLayout
+
+@using todolist.Models
+@using todolist.Services
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject TaskService TaskService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+@rendermode InteractiveServer
+
+<PageTitle>Calendar - TaskFlow</PageTitle>
+
+<div class="p-4" style="background-color: #F8FAFC; min-height: 100vh;">
+    
+    <!-- Hero Banner Card -->
+    <div class="card border-0 rounded-4 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #E0F2FE 0%, #EFF6FF 100%);">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-4 p-3 bg-primary text-white d-flex align-items-center justify-content-center shadow-sm" style="width: 56px; height: 56px; font-size: 1.5rem; background-color: #2563EB !important;">
+                    📅
+                </div>
+                <div>
+                    <h2 class="fw-bold m-0" style="color: #0F172A; font-size: 1.6rem;">Calendar</h2>
+                    <p class="text-secondary m-0 mt-1" style="font-size: 0.95rem;">Track your tasks, meetings and important dates in one place.</p>
+                </div>
+            </div>
+            <div class="d-none d-md-flex align-items-center gap-2">
+                <div class="text-end me-2">
+                    <span class="fw-bold d-block text-primary" style="font-style: italic; font-size: 1.1rem; color: #2563EB !important;">Stay Organized</span>
+                    <span class="text-secondary small fw-medium" style="font-style: italic;">Get More Done!</span>
+                </div>
+                <div class="fs-1">🗓️</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Layout Grid -->
+    <div class="row g-4">
+        
+        <!-- Left Column: Calendar View & Controls -->
+        <div class="col-lg-8 col-xl-9">
+            <div class="card border-0 rounded-4 shadow-sm bg-white p-4">
+                
+                <!-- Calendar Toolbar -->
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-2 border-bottom">
+                    
+                    <!-- Date Selector -->
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-light rounded-circle p-0 d-flex align-items-center justify-content-center border-0" style="width: 34px; height: 34px; background-color: #F1F5F9;" @onclick="PreviousPeriod">&lsaquo;</button>
+                        <span class="fw-bold px-2 d-flex align-items-center gap-2" style="font-size: 1.05rem; color: #0F172A; min-width: 170px;">
+                            📅 @GetHeaderTitle()
+                        </span>
+                        <button class="btn btn-light rounded-circle p-0 d-flex align-items-center justify-content-center border-0" style="width: 34px; height: 34px; background-color: #F1F5F9;" @onclick="NextPeriod">&rsaquo;</button>
+                    </div>
+
+                    <!-- View Switcher Tabs -->
+                    <div class="p-1 rounded-3 d-flex gap-1" style="background-color: #F1F5F9;">
+                        <button class="btn btn-sm @(selectedView == "Month" ? "text-white shadow-sm fw-semibold" : "border-0 text-secondary") px-3 rounded-2" 
+                                style="@(selectedView == "Month" ? "background-color: #2563EB;" : "")" 
+                                @onclick='() => selectedView = "Month"'>Month</button>
+                        <button class="btn btn-sm @(selectedView == "Week" ? "text-white shadow-sm fw-semibold" : "border-0 text-secondary") px-3 rounded-2" 
+                                style="@(selectedView == "Week" ? "background-color: #2563EB;" : "")" 
+                                @onclick='() => selectedView = "Week"'>Week</button>
+                        <button class="btn btn-sm @(selectedView == "Day" ? "text-white shadow-sm fw-semibold" : "border-0 text-secondary") px-3 rounded-2" 
+                                style="@(selectedView == "Day" ? "background-color: #2563EB;" : "")" 
+                                @onclick='() => selectedView = "Day"'>Day</button>
+                    </div>
+
+                    <!-- Filter Search Input -->
+                    <div class="position-relative" style="min-width: 220px;">
+                        <input type="text" class="form-control form-control-sm rounded-3 ps-4 border-0" placeholder="Search events or tasks..." @bind="searchQuery" @bind:event="oninput" style="background-color: #F1F5F9; font-size: 0.85rem; padding-top: 6px; padding-bottom: 6px; color: #334155;" />
+                        <span class="position-absolute top-50 start-0 translate-middle-y ps-2 text-muted" style="font-size: 0.8rem;">🔍</span>
+                    </div>
+                </div>
+
+                <!-- Calendar Content Container -->
+                <div class="calendar-grid border-top border-start rounded-3 overflow-hidden">
+                    
+                    @if (selectedView == "Month")
+                    {
+                        <!-- Days Header Row (Month View) -->
+                        <div class="row text-center fw-bold text-muted bg-light border-bottom g-0 py-2" style="font-size: 0.85rem; color: #64748B !important;">
+                            <div class="col">Sun</div>
+                            <div class="col">Mon</div>
+                            <div class="col">Tue</div>
+                            <div class="col">Wed</div>
+                            <div class="col">Thu</div>
+                            <div class="col">Fri</div>
+                            <div class="col">Sat</div>
+                        </div>
+
+                        <!-- Days Grid (Month View) -->
+                        @for (int week = 0; week < weeksInMonth; week++)
+                        {
+                            <div class="row g-0">
+                                @for (int dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++)
+                                {
+                                    int cellIndex = week * 7 + dayOfWeek;
+                                    int dayNumber = cellIndex - startOffset + 1;
+                                    bool isCurrentMonthDay = dayNumber > 0 && dayNumber <= daysInCurrentMonth;
+
+                                    DateTime cellDate;
+                                    if (isCurrentMonthDay)
+                                    {
+                                        cellDate = new DateTime(currentDate.Year, currentDate.Month, dayNumber);
+                                    }
+                                    else if (dayNumber <= 0)
+                                    {
+                                        var prevMonth = currentDate.AddMonths(-1);
+                                        int prevMonthDays = DateTime.DaysInMonth(prevMonth.Year, prevMonth.Month);
+                                        cellDate = new DateTime(prevMonth.Year, prevMonth.Month, prevMonthDays + dayNumber);
+                                    }
+                                    else
+                                    {
+                                        var nextMonth = currentDate.AddMonths(1);
+                                        cellDate = new DateTime(nextMonth.Year, nextMonth.Month, dayNumber - daysInCurrentMonth);
+                                    }
+
+                                    var dayTasks = FilteredTasks.Where(t => t.Deadline.Date == cellDate.Date).ToList();
+                                    bool isToday = cellDate.Date == DateTime.Today;
+
+                                    <div class="col border-end border-bottom p-2 @(isCurrentMonthDay ? "bg-white" : "bg-light text-muted")" style="min-height: 105px; background-color: @(isCurrentMonthDay ? "#FFFFFF" : "#F8FAFC") !important;">
+                                        
+                                        <!-- Day Number Indicator -->
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-semibold @(isToday ? "text-white rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" : isCurrentMonthDay ? "text-dark" : "text-muted")" 
+                                                  style="width: 24px; height: 24px; font-size: 0.82rem; @(isToday ? "background-color: #2563EB;" : "")">
+                                                @cellDate.Day
+                                            </span>
+                                        </div>
+
+                                        <!-- Tasks inside Cell -->
+                                        <div class="d-flex flex-column gap-1 overflow-auto" style="max-height: 72px;">
+                                            @foreach (var task in dayTasks)
+                                            {
+                                                <div class="p-1 px-2 rounded-3 text-truncate border-0 d-flex flex-column gap-0 shadow-2xs" 
+                                                     style="font-size: 0.72rem; cursor: pointer; @GetTaskCardStyle(task.Status)" 
+                                                     title="@task.Title">
+                                                    <div class="d-flex align-items-center gap-1 fw-bold text-truncate">
+                                                        <span class="rounded-circle" style="width: 6px; height: 6px; background-color: @GetStatusDotColor(task.Status); display: inline-block;"></span>
+                                                        <span>@task.Title</span>
+                                                    </div>
+                                                    <div class="ps-2" style="font-size: 0.65rem; opacity: 0.75;">
+                                                        @task.Deadline.ToString("hh:mm tt")
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                    else if (selectedView == "Week")
+                    {
+                        <!-- Week View (7 Columns) -->
+                        var startOfWeek = currentDate.AddDays(-(int)currentDate.DayOfWeek);
+
+                        <div class="row g-0">
+                            @for (int i = 0; i < 7; i++)
+                            {
+                                var dayDate = startOfWeek.AddDays(i);
+                                var dayTasks = FilteredTasks.Where(t => t.Deadline.Date == dayDate.Date).ToList();
+                                bool isToday = dayDate.Date == DateTime.Today;
+
+                                <div class="col border-end border-bottom p-2 bg-white" style="min-height: 380px;">
+                                    <div class="fw-bold text-center mb-2 pb-2 border-bottom @(isToday ? "text-primary" : "text-dark")">
+                                        <div class="text-uppercase small text-muted" style="font-size: 0.75rem;">@dayDate.ToString("ddd")</div>
+                                        <div class="fs-5 @(isToday ? "text-white bg-primary rounded-circle d-inline-flex align-items-center justify-content-center" : "")" 
+                                             style="@(isToday ? "width: 32px; height: 32px;" : "")">
+                                            @dayDate.Day
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex flex-column gap-2 overflow-auto" style="max-height: 300px;">
+                                        @foreach (var task in dayTasks)
+                                        {
+                                            <div class="p-2 rounded-3 shadow-2xs border-0" style="font-size: 0.78rem; @GetTaskCardStyle(task.Status)">
+                                                <div class="d-flex align-items-center gap-1 fw-bold">
+                                                    <span class="rounded-circle" style="width: 6px; height: 6px; background-color: @GetStatusDotColor(task.Status);"></span>
+                                                    <span class="text-truncate">@task.Title</span>
+                                                </div>
+                                                <div class="small opacity-75 mt-1">⏰ @task.Deadline.ToString("hh:mm tt")</div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (selectedView == "Day")
+                    {
+                        <!-- Day View (Single Day Overview) -->
+                        var todayTasks = FilteredTasks.Where(t => t.Deadline.Date == currentDate.Date).OrderBy(t => t.Deadline).ToList();
+
+                        <div class="p-4 bg-white" style="min-height: 380px;">
+                            <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                                <h5 class="fw-bold text-dark m-0">Tasks for @currentDate.ToString("dddd, MMMM dd, yyyy")</h5>
+                                <span class="badge bg-primary px-3 py-2 rounded-pill">@todayTasks.Count Tasks Today</span>
+                            </div>
+
+                            @if (todayTasks.Any())
+                            {
+                                <div class="d-flex flex-column gap-2">
+                                    @foreach (var task in todayTasks)
+                                    {
+                                        <div class="p-3 rounded-4 d-flex justify-content-between align-items-center shadow-2xs" style="@GetTaskCardStyle(task.Status)">
+                                            <div class="d-flex align-items-center gap-3">
+                                                <span class="rounded-circle" style="width: 10px; height: 10px; background-color: @GetStatusDotColor(task.Status);"></span>
+                                                <div>
+                                                    <h6 class="fw-bold m-0" style="font-size: 0.95rem;">@task.Title</h6>
+                                                    <span class="small opacity-75">⏰ Deadline: @task.Deadline.ToString("hh:mm tt")</span>
+                                                </div>
+                                            </div>
+                                            <span class="badge rounded-pill px-3 py-2 shadow-2xs" style="@GetStatusBadgeStyle(task.Status)">
+                                                @task.Status
+                                            </span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-center text-muted py-5">
+                                    <div class="fs-1 mb-2">🎉</div>
+                                    <p class="m-0 fw-medium">No tasks scheduled for this day.</p>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Upcoming Tasks & Stats Panel -->
+        <div class="col-lg-4 col-xl-3 d-flex flex-column gap-4">
+            
+            <!-- Upcoming Tasks Card -->
+            <div class="card border-0 rounded-4 shadow-sm bg-white p-3">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fs-5" style="color: #2563EB;">📋</span>
+                        <h6 class="fw-bold m-0" style="color: #0F172A;">Upcoming Tasks</h6>
+                    </div>
+                    <a href="/user/tasks" class="text-decoration-none fw-semibold small" style="color: #2563EB;">View All &rarr;</a>
+                </div>
+
+                <div class="d-flex flex-column gap-3 overflow-auto" style="max-height: 280px;">
+                    @if (UpcomingTasks.Any())
+                    {
+                        @foreach (var task in UpcomingTasks)
+                        {
+                            <div class="p-2 rounded-3 d-flex align-items-center justify-content-between" style="background-color: #F8FAFC; border: 1px solid #F1F5F9;">
+                                <div class="d-flex align-items-center gap-2 overflow-hidden">
+                                    <span class="rounded-circle" style="background-color: @GetStatusDotColor(task.Status); width: 8px; height: 8px; display: inline-block; flex-shrink: 0;"></span>
+                                    <div class="text-truncate">
+                                        <div class="fw-bold text-dark text-truncate" style="font-size: 0.85rem; color: #1E293B !important;">@task.Title</div>
+                                        <div class="text-muted small" style="font-size: 0.75rem;">📅 @task.Deadline.ToString("MMM dd, yyyy")</div>
+                                    </div>
+                                </div>
+                                <span class="badge rounded-pill px-2 py-1 flex-shrink-0" style="font-size: 0.68rem; @GetStatusBadgeStyle(task.Status)">
+                                    @task.Status
+                                </span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4 small">
+                            No upcoming tasks scheduled
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Calendar Stats Card -->
+            <div class="card border-0 rounded-4 shadow-sm bg-white p-3">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+                    <span class="fs-5" style="color: #2563EB;">📊</span>
+                    <h6 class="fw-bold m-0" style="color: #0F172A;">Calendar Stats</h6>
+                </div>
+
+                <div class="row g-2">
+                    <!-- Total Tasks -->
+                    <div class="col-6">
+                        <div class="p-3 rounded-4 d-flex flex-column align-items-start justify-content-between" style="background-color: #EFF6FF; min-height: 95px;">
+                            <div class="rounded-circle text-white d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; font-size: 0.8rem; background-color: #3B82F6;">📋</div>
+                            <div class="mt-2">
+                                <h4 class="fw-bold m-0 lh-1" style="color: #1D4ED8; font-size: 1.25rem;">@userTasks.Count</h4>
+                                <span class="text-secondary fw-medium d-block mt-1" style="font-size: 0.75rem;">Total Tasks</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Completed -->
+                    <div class="col-6">
+                        <div class="p-3 rounded-4 d-flex flex-column align-items-start justify-content-between" style="background-color: #DCFCE7; min-height: 95px;">
+                            <div class="rounded-circle text-white d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; font-size: 0.8rem; background-color: #10B981;">✓</div>
+                            <div class="mt-2">
+                                <h4 class="fw-bold m-0 lh-1" style="color: #15803D; font-size: 1.25rem;">@userTasks.Count(t => t.Status == "Completed")</h4>
+                                <span class="text-secondary fw-medium d-block mt-1" style="font-size: 0.75rem;">Completed</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- In Progress -->
+                    <div class="col-6">
+                        <div class="p-3 rounded-4 d-flex flex-column align-items-start justify-content-between" style="background-color: #F3E8FF; min-height: 95px;">
+                            <div class="rounded-circle text-white d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; font-size: 0.8rem; background-color: #A855F7;">⏳</div>
+                            <div class="mt-2">
+                                <h4 class="fw-bold m-0 lh-1" style="color: #7E22CE; font-size: 1.25rem;">@userTasks.Count(t => t.Status == "In Progress")</h4>
+                                <span class="text-secondary fw-medium d-block mt-1" style="font-size: 0.75rem;">In Progress</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pending -->
+                    <div class="col-6">
+                        <div class="p-3 rounded-4 d-flex flex-column align-items-start justify-content-between" style="background-color: #FEF3C7; min-height: 95px;">
+                            <div class="rounded-circle text-white d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; font-size: 0.8rem; background-color: #F59E0B;">📌</div>
+                            <div class="mt-2">
+                                <h4 class="fw-bold m-0 lh-1" style="color: #B45309; font-size: 1.25rem;">@userTasks.Count(t => t.Status != "Completed" && t.Status != "In Progress")</h4>
+                                <span class="text-secondary fw-medium d-block mt-1" style="font-size: 0.75rem;">Pending</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Promotion Footer Card -->
+            <div class="card border-0 rounded-4 shadow-sm p-3 text-white d-flex flex-row align-items-center justify-content-between" style="background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="fs-2">📅</div>
+                    <div>
+                        <h6 class="fw-bold m-0">Stay on Track!</h6>
+                        <p class="m-0 text-white-50 small" style="font-size: 0.75rem;">Plan your tasks, manage time and boost productivity.</p>
+                    </div>
+                </div>
+                <button class="btn btn-light rounded-circle p-0 d-flex align-items-center justify-content-center border-0 shadow-sm flex-shrink-0" 
+                        style="width: 36px; height: 36px; font-weight: bold; color: #2563EB; cursor: pointer;" 
+                        @onclick="NavigateToTasks" 
+                        title="Go to Tasks">
+                    &rarr;
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .calendar-grid {
+        border-color: #E2E8F0 !important;
+    }
+    
+    .calendar-grid .col {
+        border-color: #E2E8F0 !important;
+    }
+
+    .shadow-2xs {
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    }
+</style>
+
+@code {
+    private List<TaskItem> userTasks = new();
+    private DateTime currentDate = DateTime.Today;
+    private int daysInCurrentMonth;
+    private int startOffset;
+    private int weeksInMonth;
+    private string selectedView = "Month";
+    private string searchQuery = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTasksAsync();
+        CalculateCalendarGrid();
+    }
+
+    private async Task LoadTasksAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is { IsAuthenticated: true })
+        {
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(userIdClaim, out int userId))
+            {
+                var allTasks = await TaskService.GetAllTasksAsync();
+                userTasks = allTasks.Where(t => t.UserId == userId).ToList();
+            }
+        }
+    }
+
+    private IEnumerable<TaskItem> FilteredTasks =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? userTasks
+            : userTasks.Where(t => t.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<TaskItem> UpcomingTasks =>
+        userTasks.Where(t => t.Deadline >= DateTime.Today)
+                 .OrderBy(t => t.Deadline)
+                 .Take(5);
+
+    private void CalculateCalendarGrid()
+    {
+        var firstOfMonth = new DateTime(currentDate.Year, currentDate.Month, 1);
+        daysInCurrentMonth = DateTime.DaysInMonth(currentDate.Year, currentDate.Month);
+        startOffset = (int)firstOfMonth.DayOfWeek;
+        weeksInMonth = (int)Math.Ceiling((startOffset + daysInCurrentMonth) / 7.0);
+    }
+
+    private void PreviousPeriod()
+    {
+        if (selectedView == "Month") currentDate = currentDate.AddMonths(-1);
+        else if (selectedView == "Week") currentDate = currentDate.AddDays(-7);
+        else if (selectedView == "Day") currentDate = currentDate.AddDays(-1);
+
+        CalculateCalendarGrid();
+    }
+
+    private void NextPeriod()
+    {
+        if (selectedView == "Month") currentDate = currentDate.AddMonths(1);
+        else if (selectedView == "Week") currentDate = currentDate.AddDays(7);
+        else if (selectedView == "Day") currentDate = currentDate.AddDays(1);
+
+        CalculateCalendarGrid();
+    }
+
+    private string GetHeaderTitle() => selectedView switch
+    {
+        "Week" => $"Week of {currentDate.AddDays(-(int)currentDate.DayOfWeek):MMM dd, yyyy}",
+        "Day" => currentDate.ToString("MMM dd, yyyy"),
+        _ => currentDate.ToString("MMMM yyyy")
+    };
+
+    private void NavigateToTasks()
+    {
+        Navigation.NavigateTo("/user/tasks");
+    }
+
+    private string GetTaskCardStyle(string? status) => status switch
+    {
+        "Completed" => "background-color: #DCFCE7; color: #15803D;",
+        "In Progress" => "background-color: #F3E8FF; color: #7E22CE;",
+        "Pending" => "background-color: #FEF3C7; color: #B45309;",
+        _ => "background-color: #FFE4E6; color: #BE123C;"
+    };
+
+    private string GetStatusBadgeStyle(string? status) => status switch
+    {
+        "Completed" => "background-color: #DCFCE7; color: #15803D;",
+        "In Progress" => "background-color: #F3E8FF; color: #7E22CE;",
+        "Pending" => "background-color: #FEF3C7; color: #B45309;",
+        _ => "background-color: #FFE4E6; color: #BE123C;"
+    };
+
+    private string GetStatusDotColor(string? status) => status switch
+    {
+        "Completed" => "#10B981",
+        "In Progress" => "#7E22CE",
+        "Pending" => "#F59E0B",
+        _ => "#EF4444"
+    };
+}

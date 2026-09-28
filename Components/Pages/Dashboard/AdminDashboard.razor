@@ -1,0 +1,488 @@
+﻿@page "/admin-dashboard"
+@layout AdminLayout
+@using todolist.Components.Layout
+@using Microsoft.AspNetCore.Components.Authorization
+@rendermode InteractiveServer
+
+@inject todolist.Services.UserService UserService
+@inject todolist.Services.TaskService TaskService
+@inject NavigationManager Navigation
+
+<div class="container-fluid p-0 pb-5">
+
+    <!-- Top Welcome Banner Card -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 position-relative overflow-hidden" style="background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);">
+        <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span style="font-size: 1.5rem;">👋</span>
+                    <h2 class="fw-bold text-dark mb-0 fs-3">@GetGreeting(), @adminName</h2>
+                </div>
+                <p class="text-muted small mb-1">Here's your organization overview for today.</p>
+                <span class="text-secondary small fw-medium">📅 @DateTime.Now.ToString("MMMM dd, yyyy")</span>
+            </div>
+            <div class="d-none d-md-block text-end">
+                <div class="bg-white p-3 rounded-4 shadow-sm d-flex align-items-center gap-3">
+                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 text-primary">
+                        🎯
+                    </div>
+                    <div class="text-start">
+                        <small class="text-muted d-block" style="font-size: 0.75rem;">Completion Rate</small>
+                        <span class="fw-bold text-dark">@(totalTasks > 0 ? Math.Round((double)completedTasks / totalTasks * 100) : 0)%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top 4 Metric Stat Cards -->
+    <div class="row g-3 mb-4">
+        <!-- Total Users Card -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 position-relative hover-lift" @onclick='() => Navigation.NavigateTo("/admin/users")' style="cursor: pointer;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" style="background-color: #eef2ff; color: #4f46e5; width: 42px; height: 42px;">
+                        👥
+                    </div>
+                    <span class="text-muted small">➔</span>
+                </div>
+                <div class="text-muted small fw-medium mb-1">Total Users</div>
+                <div class="h2 fw-bold mb-1 text-dark">@totalUsers</div>
+                <div class="text-success small fw-medium" style="font-size: 0.75rem;">
+                    🟢 All system accounts active
+                </div>
+            </div>
+        </div>
+
+        <!-- Departments Card -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 position-relative hover-lift" @onclick='() => Navigation.NavigateTo("/admin/departments")' style="cursor: pointer;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" style="background-color: #ecfdf5; color: #10b981; width: 42px; height: 42px;">
+                        🏢
+                    </div>
+                    <span class="text-muted small">➔</span>
+                </div>
+                <div class="text-muted small fw-medium mb-1">Departments</div>
+                <div class="h2 fw-bold mb-1 text-dark">@totalDepartments</div>
+                <div class="text-success small fw-medium" style="font-size: 0.75rem;">
+                    🟢 All departments active
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Tasks Card -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 position-relative hover-lift" @onclick='() => Navigation.NavigateTo("/admin/tasks")' style="cursor: pointer;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" style="background-color: #f3e8ff; color: #9333ea; width: 42px; height: 42px;">
+                        ☑️
+                    </div>
+                    <span class="text-muted small">➔</span>
+                </div>
+                <div class="text-muted small fw-medium mb-1">Total Tasks</div>
+                <div class="h2 fw-bold mb-1 text-dark">@totalTasks</div>
+                <div class="text-muted small" style="font-size: 0.75rem;">
+                    <span class="text-primary fw-semibold">@completedTasks</span> completed
+                </div>
+            </div>
+        </div>
+
+        <!-- Overdue Tasks Card -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 position-relative hover-lift" @onclick='() => Navigation.NavigateTo("/admin/tasks")' style="cursor: pointer;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" style="background-color: #fef2f2; color: #ef4444; width: 42px; height: 42px;">
+                        ⚠️
+                    </div>
+                    <span class="text-muted small">➔</span>
+                </div>
+                <div class="text-muted small fw-medium mb-1">Overdue Tasks</div>
+                <div class="h2 fw-bold mb-1 text-dark">@overdueTasks</div>
+                <div class="text-danger small fw-medium" style="font-size: 0.75rem;">
+                    @(overdueTasks > 0 ? "Requires immediate attention" : "All deadlines met")
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Middle Row: Performance, Distribution & Quick Actions -->
+    <div class="row g-4 mb-4">
+        <!-- Task Performance Breakdown -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h5 class="fw-bold text-dark m-0 fs-6">📊 Task Performance</h5>
+                        <small class="text-muted" style="font-size: 0.75rem;">Track task status breakdown for the current week</small>
+                    </div>
+                    <span class="badge bg-light text-dark border">This Week</span>
+                </div>
+
+                @{
+                    // Dynamically scale bar heights based on the maximum total count across the week
+                    int maxTaskCount = performanceDays.Count > 0 ? performanceDays.Max(d => d.Completed + d.InProgress + d.Pending) : 1;
+                    if (maxTaskCount == 0) maxTaskCount = 1;
+                }
+
+                <!-- Dynamic Chart Bars -->
+                <div class="d-flex align-items-end justify-content-between pt-4 pb-2 px-2" style="height: 180px; border-bottom: 1px dashed #e5e7eb;">
+                    @foreach (var day in performanceDays)
+                    {
+                        <div class="d-flex flex-column align-items-center gap-1" style="width: 12%;">
+                            <div class="w-100 d-flex flex-column justify-content-end gap-1" style="height: 130px;">
+                                <div class="bg-success rounded-top"
+                                     style="height: @((double)day.Completed / maxTaskCount * 100)%; min-height: @(day.Completed > 0 ? "4px" : "0px");"
+                                     title="Completed: @day.Completed"></div>
+                                <div class="bg-primary"
+                                     style="height: @((double)day.InProgress / maxTaskCount * 100)%; min-height: @(day.InProgress > 0 ? "4px" : "0px");"
+                                     title="In Progress: @day.InProgress"></div>
+                                <div class="bg-warning rounded-bottom"
+                                     style="height: @((double)day.Pending / maxTaskCount * 100)%; min-height: @(day.Pending > 0 ? "4px" : "0px");"
+                                     title="Pending: @day.Pending"></div>
+                            </div>
+                            <span class="text-muted" style="font-size: 0.7rem;">@day.DayName</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="d-flex justify-content-center gap-3 mt-3 flex-wrap" style="font-size: 0.75rem;">
+                    <span class="d-flex align-items-center gap-1"><span class="rounded-circle bg-success d-inline-block" style="width:8px; height:8px;"></span> Completed</span>
+                    <span class="d-flex align-items-center gap-1"><span class="rounded-circle bg-primary d-inline-block" style="width:8px; height:8px;"></span> In Progress</span>
+                    <span class="d-flex align-items-center gap-1"><span class="rounded-circle bg-warning d-inline-block" style="width:8px; height:8px;"></span> Pending</span>
+                    <span class="d-flex align-items-center gap-1"><span class="rounded-circle bg-danger d-inline-block" style="width:8px; height:8px;"></span> Overdue</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Status Radial Overview -->
+        <div class="col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <h5 class="fw-bold text-dark mb-1 fs-6">⏳ Task Status</h5>
+                <small class="text-muted d-block mb-3" style="font-size: 0.75rem;">Overall task distribution</small>
+
+                <!-- Circle Status representation -->
+                <div class="d-flex justify-content-center my-2">
+                    <div class="position-relative d-flex align-items-center justify-content-center" style="width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(#10b981 0% @(completedPct)%, #3b82f6 @(completedPct)% @(completedPct + inProgressPct)%, #f59e0b @(completedPct + inProgressPct)% @(completedPct + inProgressPct + pendingPct)%, #ef4444 @(completedPct + inProgressPct + pendingPct)% 100%);">
+                        <div class="bg-white rounded-circle d-flex flex-column align-items-center justify-content-center" style="width: 84px; height: 84px;">
+                            <span class="fw-bold text-dark fs-5">@(completedPct)%</span>
+                            <span class="text-muted" style="font-size: 0.65rem;">Completed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legend List -->
+                <div class="d-flex flex-column gap-2 mt-3" style="font-size: 0.8rem;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted"><span class="rounded-circle bg-success d-inline-block me-1" style="width:8px; height:8px;"></span> Completed</span>
+                        <span class="fw-bold text-dark">@completedTasks (@(completedPct)%)</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted"><span class="rounded-circle bg-primary d-inline-block me-1" style="width:8px; height:8px;"></span> In Progress</span>
+                        <span class="fw-bold text-dark">@inProgressTasks (@(inProgressPct)%)</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted"><span class="rounded-circle bg-warning d-inline-block me-1" style="width:8px; height:8px;"></span> Pending</span>
+                        <span class="fw-bold text-dark">@pendingTasks (@(pendingPct)%)</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted"><span class="rounded-circle bg-danger d-inline-block me-1" style="width:8px; height:8px;"></span> Overdue</span>
+                        <span class="fw-bold text-dark">@overdueTasks (@(overduePct)%)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Quick Actions Panel -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="text-primary">⚡</span>
+                    <h5 class="fw-bold text-dark m-0 fs-6">Quick Actions</h5>
+                </div>
+                <p class="text-muted small mb-3" style="font-size: 0.8rem;">Access common system operations</p>
+
+                <div class="d-flex flex-column gap-3">
+                    <div class="p-3 border rounded-4 bg-light bg-opacity-50 d-flex align-items-center justify-content-between hover-lift" @onclick='() => Navigation.NavigateTo("/admin/users")' style="cursor: pointer;">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="bg-primary text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">👤</div>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark" style="font-size: 0.88rem;">Add New User</h6>
+                                <small class="text-muted" style="font-size: 0.73rem;">Register a new user</small>
+                            </div>
+                        </div>
+                        <span class="text-muted small fw-bold">➔</span>
+                    </div>
+
+                    <div class="p-3 border rounded-4 bg-light bg-opacity-50 d-flex align-items-center justify-content-between hover-lift" @onclick='() => Navigation.NavigateTo("/admin/departments")' style="cursor: pointer;">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="bg-success text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">🏢</div>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark" style="font-size: 0.88rem;">Create Department</h6>
+                                <small class="text-muted" style="font-size: 0.73rem;">Organize your teams</small>
+                            </div>
+                        </div>
+                        <span class="text-muted small fw-bold">➔</span>
+                    </div>
+
+                    <div class="p-3 border rounded-4 bg-light bg-opacity-50 d-flex align-items-center justify-content-between hover-lift" @onclick='() => Navigation.NavigateTo("/admin/tasks")' style="cursor: pointer;">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="bg-purple text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; background-color: #9333ea;">📋</div>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark" style="font-size: 0.88rem;">Assign New Task</h6>
+                                <small class="text-muted" style="font-size: 0.73rem;">Keep work on track</small>
+                            </div>
+                        </div>
+                        <span class="text-muted small fw-bold">➔</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Row: Recent Tasks Table & Upcoming Deadlines -->
+    <div class="row g-4">
+        <!-- Recent Tasks List Table -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h5 class="fw-bold text-dark m-0 fs-6">📋 Recent Tasks</h5>
+                        <small class="text-muted" style="font-size: 0.75rem;">Latest tasks from your organization</small>
+                    </div>
+                    <button class="btn btn-link text-primary text-decoration-none p-0 fw-semibold small" @onclick='() => Navigation.NavigateTo("/admin/tasks")'>View all ➔</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 0.82rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-muted border-0 fw-semibold">Task Title</th>
+                                <th class="text-muted border-0 fw-semibold">Assigned To</th>
+                                <th class="text-muted border-0 fw-semibold">Status</th>
+                                <th class="text-muted border-0 fw-semibold">Deadline</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (recentTasksList.Any())
+                            {
+                                @foreach (var task in recentTasksList)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold text-dark">@task.Title</td>
+                                        <td class="text-muted">@(string.IsNullOrWhiteSpace(task.AssignedTo) ? "Unassigned" : task.AssignedTo)</td>
+                                        <td>
+                                            @if (string.Equals(task.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1">Completed</span>
+                                            }
+                                            else if (string.Equals(task.Status, "In Progress", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1">In Progress</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1">@(string.IsNullOrWhiteSpace(task.Status) ? "Pending" : task.Status)</span>
+                                            }
+                                        </td>
+                                        <td class="text-muted">@(task.Deadline != DateTime.MinValue ? task.Deadline.ToString("MMM dd, yyyy") : "No Due Date")</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-3">No recent tasks found.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Deadlines Feed -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h5 class="fw-bold text-dark m-0 fs-6">📅 Upcoming Deadlines</h5>
+                        <small class="text-muted" style="font-size: 0.75rem;">Tasks approaching due dates</small>
+                    </div>
+                    <button class="btn btn-link text-primary text-decoration-none p-0 fw-semibold small" @onclick='() => Navigation.NavigateTo("/admin/tasks")'>View all ➔</button>
+                </div>
+
+                <div class="d-flex flex-column gap-3">
+                    @if (upcomingDeadlines.Any())
+                    {
+                        @foreach (var task in upcomingDeadlines)
+                        {
+                            <div class="d-flex align-items-center justify-content-between p-2 rounded-3 bg-light bg-opacity-50">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="rounded-circle bg-warning d-inline-block" style="width: 8px; height: 8px;"></span>
+                                    <div>
+                                        <div class="fw-bold text-dark" style="font-size: 0.82rem;">@task.Title</div>
+                                        <div class="text-muted" style="font-size: 0.72rem;">Assigned to: @(task.AssignedTo ?? "N/A")</div>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1" style="font-size: 0.7rem;">
+                                        @(task.Deadline != DateTime.MinValue ? task.Deadline.ToString("MMM dd") : "Due Soon")
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4 small">No upcoming deadlines within this period.</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-lift {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+        .hover-lift:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 .5rem 1rem rgba(0,0,0,.08) !important;
+        }
+</style>
+
+@code {
+    private string adminName = "Admin";
+    private int totalUsers = 0;
+    private int totalDepartments = 0;
+    private int activeTasks = 0;
+    private int totalTasks = 0;
+    private int completedTasks = 0;
+    private int inProgressTasks = 0;
+    private int pendingTasks = 0;
+    private int overdueTasks = 0;
+
+    private int completedPct = 0;
+    private int inProgressPct = 0;
+    private int pendingPct = 0;
+    private int overduePct = 0;
+
+    private List<todolist.Models.TaskItem> recentTasksList = new();
+    private List<todolist.Models.TaskItem> upcomingDeadlines = new();
+    private List<DayPerformance> performanceDays = new();
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState != null)
+        {
+            var authState = await AuthState;
+            var user = authState?.User;
+            if (user?.Identity?.IsAuthenticated == true)
+            {
+                var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? user.Identity.Name;
+                if (!string.IsNullOrEmpty(email))
+                {
+                    var dbUser = await UserService.GetUserByEmailAsync(email);
+                    if (dbUser != null && !string.IsNullOrEmpty(dbUser.Name))
+                    {
+                        adminName = dbUser.Name;
+                    }
+                }
+            }
+        }
+
+        await LoadMetricsAsync();
+    }
+
+    private string GetGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+
+        if (hour >= 5 && hour < 12) return "Good Morning";
+        if (hour >= 12 && hour < 17) return "Good Afternoon";
+
+        return "Good Evening";
+    }
+
+    private async Task LoadMetricsAsync()
+    {
+        // 1. Fetch Users
+        var users = await UserService.GetAllUsersAsync() ?? new();
+        totalUsers = users.Count;
+
+        totalDepartments = users
+            .Where(u => !string.IsNullOrWhiteSpace(u.Department))
+            .Select(u => u.Department.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        // 2. Fetch Tasks & Calculate Metrics
+        var tasks = await TaskService.GetAllTasksAsync() ?? new();
+        totalTasks = tasks.Count;
+
+        completedTasks = tasks.Count(t => string.Equals(t.Status?.Trim(), "Completed", StringComparison.OrdinalIgnoreCase));
+        inProgressTasks = tasks.Count(t => string.Equals(t.Status?.Trim(), "In Progress", StringComparison.OrdinalIgnoreCase));
+        pendingTasks = tasks.Count(t => string.IsNullOrWhiteSpace(t.Status) || string.Equals(t.Status?.Trim(), "Pending", StringComparison.OrdinalIgnoreCase));
+
+        // Calculate Overdue tasks based on Deadline property
+        overdueTasks = tasks.Count(t => t.Deadline != DateTime.MinValue && t.Deadline.Date < DateTime.Now.Date && !string.Equals(t.Status?.Trim(), "Completed", StringComparison.OrdinalIgnoreCase));
+
+        activeTasks = totalTasks - completedTasks;
+
+        // Calculate Percentages
+        if (totalTasks > 0)
+        {
+            completedPct = (int)Math.Round((double)completedTasks / totalTasks * 100);
+            inProgressPct = (int)Math.Round((double)inProgressTasks / totalTasks * 100);
+            pendingPct = (int)Math.Round((double)pendingTasks / totalTasks * 100);
+            overduePct = (int)Math.Round((double)overdueTasks / totalTasks * 100);
+        }
+
+        // 3. Populate Recent Tasks Table (Top 5)
+        recentTasksList = tasks.Take(5).ToList();
+
+        // 4. Populate Upcoming Deadlines (Tasks due in the future, not completed) using Deadline property
+        upcomingDeadlines = tasks
+            .Where(t => t.Deadline != DateTime.MinValue && t.Deadline.Date >= DateTime.Now.Date && !string.Equals(t.Status?.Trim(), "Completed", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(t => t.Deadline)
+            .Take(4)
+            .ToList();
+
+        // 5. Dynamic Weekly Task Performance Breakdown (Monday through Sunday of current week)
+        var today = DateTime.Today;
+        int diff = (7 + (today.DayOfWeek - DayOfWeek.Monday)) % 7;
+        var startOfWeek = today.AddDays(-1 * diff).Date;
+
+        performanceDays = new List<DayPerformance>();
+
+        for (int i = 0; i < 7; i++)
+        {
+            var currentDay = startOfWeek.AddDays(i);
+
+            // Filters tasks scheduled/due on this specific day
+            var tasksForDay = tasks.Where(t => t.Deadline != DateTime.MinValue && t.Deadline.Date == currentDay).ToList();
+
+            performanceDays.Add(new DayPerformance
+            {
+                DayName = currentDay.ToString("ddd"), // e.g., "Mon", "Tue"
+                Completed = tasksForDay.Count(t => string.Equals(t.Status?.Trim(), "Completed", StringComparison.OrdinalIgnoreCase)),
+                InProgress = tasksForDay.Count(t => string.Equals(t.Status?.Trim(), "In Progress", StringComparison.OrdinalIgnoreCase)),
+                Pending = tasksForDay.Count(t => string.IsNullOrWhiteSpace(t.Status) || string.Equals(t.Status?.Trim(), "Pending", StringComparison.OrdinalIgnoreCase))
+            });
+        }
+    }
+
+    public class DayPerformance
+    {
+        public string DayName { get; set; } = "";
+        public int Completed { get; set; }
+        public int InProgress { get; set; }
+        public int Pending { get; set; }
+    }
+}

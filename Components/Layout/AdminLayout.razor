@@ -1,0 +1,209 @@
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthStateProvider
+@inject todolist.Services.UserService UserService
+@inject NavigationManager Navigation
+
+<div style="min-height: 100vh; position: relative; background-color: #f8fafc;">
+    <!-- Admin Sidebar (Fixed Position matching User Layout) -->
+    <aside style="position: fixed; left: 0; top: 0; width: 240px; height: 100vh; z-index: 1000; background-color: #0d3b66 !important; display: flex; flex-direction: column; justify-content: space-between; padding: 20px 16px; box-sizing: border-box;">
+        <div>
+            <!-- Brand Title with Admin Badge -->
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 28px; padding-left: 8px;">
+                <div style="background-color: white; color: #0d3b66; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem;">✓</div>
+                <span style="font-size: 1.25rem; font-weight: bold; color: white;">TaskFlow</span>
+                <span style="background-color: #ef4444; color: white; font-size: 0.6rem; padding: 2px 5px; border-radius: 4px; font-weight: 700; text-transform: uppercase;">Admin</span>
+            </div>
+
+            <!-- Navigation Links with Icons and Active Pill styling -->
+            <nav style="display: flex; flex-direction: column; gap: 6px;" class="admin-sidebar-nav">
+                <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/admin-dashboard" Match="NavLinkMatch.All">
+                    <span>🏠</span> Dashboard
+                </NavLink>
+                <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/admin/users">
+                    <span>👥</span> Users
+                </NavLink>
+                <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/admin/departments">
+                    <span>🏢</span> Departments
+                </NavLink>
+                <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/admin/tasks">
+                    <span>📋</span> Tasks
+                </NavLink>
+                 <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/admin/notifications">
+                    <span>🔔</span> Notification
+                </NavLink>
+                <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/admin/reports">
+                    <span>📊</span> Reports
+                </NavLink>
+                <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/admin/profile">
+                    <span>👤</span> Profile
+                </NavLink>
+            </nav>
+        </div>
+
+        <!-- Pinned Bottom Logout Button -->
+        <div style="padding-top: 16px; margin-top: auto;">
+            <form action="/Account/Logout" method="post" style="margin: 0; width: 100%;">
+                <AntiforgeryToken />
+                <button type="submit" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M6 12.5a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-8a.5.5 0 0 0-.5.5v2a.5.5 0 0 1-1 0v-2A1.5 1.5 0 0 1 6.5 2h8A1.5 1.5 0 0 1 16 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-8A1.5 1.5 0 0 1 5 12.5v-2a.5.5 0 0 1 1 0z" />
+                        <path fill-rule="evenodd" d="M.146 8.354a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L1.707 7.5H10.5a.5.5 0 0 1 0 1H1.707l2.147 2.146a.5.5 0 0 1-.708.708z" />
+                    </svg>
+                    Logout
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- Top Bar (Fixed Position, offset by sidebar width) -->
+    <header style="position: fixed; left: 240px; right: 0; top: 0; height: 60px; z-index: 1001; background-color: #0d3b66; display: flex; align-items: center; justify-content: flex-end; padding: 0 32px; color: white;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <!-- Profile Dropdown Container -->
+            <div class="position-relative">
+                <button type="button" @onclick="ToggleDropdown" class="btn text-white d-flex align-items-center gap-2 border-0 py-1 px-2 rounded-pill shadow-none" style="background-color: rgba(255,255,255,0.12) !important;">
+                    @if (!string.IsNullOrWhiteSpace(adminProfilePic))
+                    {
+                        <img src="@adminProfilePic" alt="Avatar" class="rounded-circle object-fit-cover" style="width: 32px; height: 32px; border: 1px solid white;" />
+                    }
+                    else
+                    {
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold shadow-sm" style="width: 32px; height: 32px; font-size: 0.9rem;">
+                            @GetAdminInitial()
+                        </div>
+                    }
+                    <span style="font-weight: 600; font-size: 0.9rem;">@adminName</span>
+                    <span style="font-size: 0.75rem;">▼</span>
+                </button>
+
+                <!-- Dropdown Menu -->
+                @if (isDropdownOpen)
+                {
+                    <div class="position-absolute end-0 mt-2 bg-white text-dark shadow rounded-3 py-2 border" style="width: 220px; z-index: 1050;">
+                        <div class="px-3 py-2 border-bottom mb-1">
+                            <p class="mb-0 fw-bold small text-dark">@adminName</p>
+                            <p class="mb-0 text-muted" style="font-size: 0.75rem;">Administrator</p>
+                        </div>
+                        <button type="button" class="dropdown-item py-2 px-3 small d-flex align-items-center gap-2 text-dark bg-transparent border-0 w-100 text-start" @onclick="GoToProfile">
+                            <span>👤</span> View Profile
+                        </button>
+                        
+                        <!-- Hidden file input for uploading profile picture from dropdown -->
+                        <InputFile id="adminProfileImageUpload" OnChange="HandleImageUpload" class="d-none" accept=".png,.jpg,.jpeg" />
+                        <label for="adminProfileImageUpload" class="dropdown-item py-2 px-3 small d-flex align-items-center gap-2 text-dark m-0" style="cursor: pointer;">
+                            <span>📷</span> Add / Change Profile Image
+                        </label>
+                    </div>
+                }
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Page Content Container (Scrollable) -->
+    <main style="margin-left: 240px; height: 100vh; box-sizing: border-box; padding-top: calc(60px + 24px); padding-left: 24px; padding-right: 24px; padding-bottom: 24px; background-color: #f8fafc; overflow-y: auto;">
+        @Body
+    </main>
+</div>
+
+<!-- Scoped styling to replicate active blue Pill highlight on sidebar -->
+<style>
+    .admin-sidebar-nav .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+    .admin-sidebar-nav .nav-link.active {
+        background-color: #2563eb !important;
+        color: white !important;
+        font-weight: 600;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+</style>
+
+@code {
+    private string adminName = "Admin";
+    private string adminEmail = string.Empty;
+    private string adminProfilePic = string.Empty;
+    private bool isDropdownOpen = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is { IsAuthenticated: true })
+        {
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            adminEmail = user.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;
+
+            if (int.TryParse(userIdClaim, out int userId))
+            {
+                var allUsers = await UserService.GetAllUsersAsync();
+                var dbUser = allUsers?.FirstOrDefault(u => u.Id == userId);
+                if (dbUser != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(dbUser.Name))
+                        adminName = dbUser.Name;
+                    
+                    var picProp = dbUser.GetType().GetProperty("ProfilePicture");
+                    if (picProp != null)
+                    {
+                        adminProfilePic = picProp.GetValue(dbUser)?.ToString() ?? string.Empty;
+                    }
+                }
+            }
+
+            if (adminName == "Admin" && !string.IsNullOrWhiteSpace(adminEmail))
+            {
+                var emailPrefix = adminEmail.Split('@')[0];
+                adminName = char.ToUpper(emailPrefix[0]) + emailPrefix.Substring(1);
+            }
+        }
+    }
+
+    private void ToggleDropdown()
+    {
+        isDropdownOpen = !isDropdownOpen;
+    }
+
+    private string GetAdminInitial() =>
+        !string.IsNullOrWhiteSpace(adminName) ? adminName[0].ToString().ToUpper() : "A";
+
+    private void GoToProfile()
+    {
+        isDropdownOpen = false;
+        Navigation.NavigateTo("/admin/profile");
+    }
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        isDropdownOpen = false;
+        var file = e.File;
+        if (file != null)
+        {
+            var maxAllowedSize = 512_000; // 500KB limit
+            if (file.Size > maxAllowedSize) return;
+
+            using var stream = file.OpenReadStream(maxAllowedSize);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var base64Data = Convert.ToBase64String(ms.ToArray());
+            adminProfilePic = $"data:{file.ContentType};base64,{base64Data}";
+
+            if (!string.IsNullOrEmpty(adminEmail))
+            {
+                var dbUser = await UserService.GetUserByEmailAsync(adminEmail);
+                if (dbUser != null)
+                {
+                    var picProp = dbUser.GetType().GetProperty("ProfilePicture");
+                    if (picProp != null && picProp.CanWrite)
+                    {
+                        picProp.SetValue(dbUser, adminProfilePic);
+                        await UserService.UpdateUserAsync(dbUser);
+                    }
+                }
+            }
+            StateHasChanged();
+        }
+    }
+}

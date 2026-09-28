@@ -1,0 +1,71 @@
+﻿@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.Authorization
+
+<nav style="display: flex; flex-direction: column; gap: 6px;" class="user-sidebar-nav">
+    <!-- Dashboard Link -->
+    <AuthorizeView>
+        <Authorized Context="auth">
+            @if (auth.User.IsInRole("Admin"))
+            {
+                <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/admin-dashboard">
+                    <span>🏠</span> Dashboard
+                </NavLink>
+            }
+            else
+            {
+                <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/userdashboard">
+                    <span>🏠</span> Dashboard
+                </NavLink>
+            }
+        </Authorized>
+        <NotAuthorized>
+            <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/login">
+                <span>🏠</span> Dashboard
+            </NavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+
+    <!-- Tasks Link -->
+    <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/user/tasks">
+        <span>📋</span> Tasks
+    </NavLink>
+
+    <!-- Calendar Link (Fixed formatting & route) -->
+    <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/user/calendar">
+        <span>📅</span> Calendar
+    </NavLink>
+
+    <!-- Profile Link -->
+    <NavLink class="nav-link text-white py-2 px-3 rounded-3 fw-medium d-flex align-items-center gap-2" href="/user/profile">
+        <span>👤</span> Profile
+    </NavLink>
+</nav>
+
+<!-- Enhanced styling with display fix for transforms -->
+<style>
+    .user-sidebar-nav .nav-link {
+        display: flex !important;
+        align-items: center;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        border: none;
+        color: white !important;
+        text-decoration: none;
+    }
+    
+    .user-sidebar-nav .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        transform: translateX(4px) !important;
+    }
+    
+    .user-sidebar-nav .nav-link:active {
+        transform: scale(0.95) !important;
+    }
+    
+    .user-sidebar-nav .nav-link.active {
+        background-color: #2563eb !important;
+        color: white !important;
+        font-weight: 600;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transform: none !important; /* Prevents transform glitch when active */
+    }
+</style>

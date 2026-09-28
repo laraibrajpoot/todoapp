@@ -1,0 +1,32 @@
+@using todolist.Models
+<div class="task-item">
+    <div>
+        <div class="fw-bold">@Task.Title</div>
+        <div class="meta">@Task.Description @if(Task.DueDate is not null){<span> • due @Task.DueDate.Value.ToString("d")</span>}</div>
+    </div>
+    <div class="d-flex align-items-center">
+        @if (!Task.IsCompleted)
+        {
+            <button class="ffc-btn me-2" @onclick="ToggleComplete">Mark Done</button>
+        }
+        else
+        {
+            <span class="muted">Completed</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public TaskModel Task { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<TaskModel> OnUpdated { get; set; }
+
+    private async Task ToggleComplete()
+    {
+        Task.IsCompleted = !Task.IsCompleted;
+        if (OnUpdated.HasDelegate)
+            await OnUpdated.InvokeAsync(Task);
+    }
+}

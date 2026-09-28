@@ -1,0 +1,463 @@
+﻿@page "/"
+
+@page "/login"
+
+@layout todolist.Components.Layout.AuthLayout
+
+@inject NavigationManager Navigation
+<PageTitle>Sign In - TaskFlow</PageTitle><style>
+
+/* Left panel with the spiral background */
+
+.auth-left {
+
+position: relative;
+
+background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%);
+
+overflow: hidden;
+
+padding: 0;
+
+display: flex;
+
+flex-direction: row;
+
+justify-content: center;
+
+align-items: center;
+
+width: 50%;
+
+min-height: 100vh;
+
+}
+
+
+
+/* Decorative Spiral / Wave background lines */
+
+.auth-left::before {
+
+content: "";
+
+position: absolute;
+
+top: -50%;
+
+left: -50%;
+
+width: 200%;
+
+height: 200%;
+
+background-image: repeating-radial-gradient( circle at 0% 50%, transparent, transparent 30px, rgba(255, 255, 255, 0.04) 30px, rgba(255, 255, 255, 0.04) 60px );
+
+transform: rotate(25deg);
+
+pointer-events: none;
+
+}
+
+
+
+.auth-left::after {
+
+content: "";
+
+position: absolute;
+
+bottom: -20px;
+
+left: -20px;
+
+width: 150px;
+
+height: 150px;
+
+background: radial-gradient( circle, rgba(255, 255, 255, 0.15) 0%, transparent 70% );
+
+border-radius: 50%;
+
+pointer-events: none;
+
+}
+
+
+
+/* Wrapper set to full height and width with flex expansion */
+
+.illustration-wrapper {
+
+width: 100%;
+
+height: 100%;
+
+flex: 1;
+
+display: flex;
+
+justify-content: center;
+
+align-items: center;
+
+z-index: 1;
+
+}
+
+
+
+/* Stretches the image vertically to fill top and bottom completely while keeping width intact */
+
+.auth-illustration-img {
+
+width: 100%;
+
+height: 100%;
+
+object-fit: fill;
+
+border-radius: 0;
+
+filter: drop-shadow(0 15px 35px rgba(0, 0, 0, 0.35));
+
+}
+
+
+
+/* Right Card Brand Header */
+
+.brand-header-card {
+
+display: flex;
+
+align-items: center;
+
+gap: 10px;
+
+margin-bottom: 20px;
+
+}
+
+
+
+.brand-icon {
+
+width: 38px;
+
+height: 38px;
+
+background: #eef2ff;
+
+color: #0d3b66;
+
+display: flex;
+
+align-items: center;
+
+justify-content: center;
+
+border-radius: 8px;
+
+font-size: 1.2rem;
+
+}
+
+
+
+.brand-title {
+
+font-size: 1.5rem;
+
+font-weight: 700;
+
+color: #0d3b66;
+
+margin: 0;
+
+}
+
+
+
+/* Custom Theme overrides matching Create Account button & link colors */
+
+.btn-navy-primary {
+
+background-color: #0d3b66 !important;
+
+border-color: #0d3b66 !important;
+
+color: #ffffff !important;
+
+font-weight: 600;
+
+}
+
+
+
+.btn-navy-primary:hover {
+
+background-color: #092c4d !important;
+
+border-color: #092c4d !important;
+
+}
+
+
+
+input[type="password"]::-ms-reveal,
+
+input[type="password"]::-ms-clear {
+
+display: none !important;
+
+}
+
+
+
+input[type="password"]::-webkit-credentials-auto-fill-button {
+
+visibility: hidden !important;
+
+display: none !important;
+
+}</style><div class="auth-page">
+
+<!-- Left Panel with Stretched Height Image and Spiral Background -->
+
+<div class="auth-left">
+
+<div class="illustration-wrapper">
+
+<img src="/images/sidebarpic.png"
+
+alt="TaskFlow Illustration"
+
+class="auth-illustration-img" />
+
+</div>
+
+</div>
+
+
+
+<!-- Right Login Form Panel -->
+
+<div class="auth-right">
+
+<div class="login-card">
+
+
+
+<!-- Brand & Heading Section -->
+<div class="brand-header-card">
+    <div class="brand-icon" style="background: transparent; padding: 0;">
+        <img src="/images/logo.png" 
+             alt="TaskFlow Logo" 
+             style="width: 100%; height: 100%; object-fit: contain;" />
+    </div>
+    <h1 class="brand-title">TaskFlow</h1>
+</div>
+
+
+<h2 style="font-size: 1.8rem; font-weight: 700; color: #111827; margin-bottom: 4px;">
+
+Welcome Back!
+
+</h2>
+
+
+
+<p style="color: #6b7280; font-size: 0.95rem; margin-bottom: 24px;">
+
+Please enter login details below
+
+</p>
+
+
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+
+{
+
+<div class="alert alert-danger"
+
+style="color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.9rem;">
+
+@ErrorMessage
+
+</div>
+
+}
+
+
+
+<form action="/Account/Login" method="post" data-enhance="false" autocomplete="off">
+
+
+
+<div class="form-group mb-3">
+
+<label style="font-weight: 600; color: #374151; font-size: 0.9rem; margin-bottom: 6px;">
+
+Email
+
+</label>
+
+
+
+<input type="email"
+
+class="form-control"
+
+name="email"
+
+placeholder="Enter the email"
+
+required
+
+autocomplete="off" />
+
+</div>
+
+
+
+<div class="form-group mb-3">
+
+<label style="font-weight: 600; color: #374151; font-size: 0.9rem; margin-bottom: 6px;">
+
+Password
+
+</label>
+
+
+
+<div style="position: relative; display: flex; align-items: center; width: 100%;">
+
+<input type="@(showPassword ? "text" : "password")"
+
+class="form-control"
+
+style="width: 100%; padding-right: 45px;"
+
+name="password"
+
+placeholder="Enter the Password"
+
+required
+
+autocomplete="new-password" />
+
+
+
+<button type="button"
+
+@onclick="TogglePasswordVisibility"
+
+style="position: absolute; right: 12px; background: transparent; border: none; box-shadow: none; padding: 0; cursor: pointer; color: #6b7280; display: flex; align-items: center; justify-content: center; z-index: 20;"
+
+aria-label="Toggle password visibility">
+
+<i class="bi @(showPassword ? "bi-eye-slash" : "bi-eye")" style="font-size: 1.1rem; line-height: 1;"></i>
+
+</button>
+
+</div>
+
+</div>
+
+
+
+<div class="form-options mb-4"
+
+style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+
+
+
+<label style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; color: #4b5563;">
+
+<input type="checkbox"
+
+name="rememberMe"
+
+value="true" />
+
+Remember me
+
+</label>
+
+
+
+<a href="/forgot-password"
+
+style="color: #0d3b66; text-decoration: none; font-weight: 500;">
+
+Forgot password?
+
+</a>
+
+</div>
+
+
+
+<!-- Sign in button -->
+
+<button type="submit"
+
+class="login-btn btn btn-navy-primary w-100 py-2">
+
+Sign in
+
+</button>
+
+
+
+<!-- Signup -->
+
+<p class="signup-link"
+
+style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: #6b7280;">
+
+Don't have an account?
+
+<a href="/signup"
+
+style="color: #0d3b66; font-weight: 600; text-decoration: none;">
+
+Sign Up
+
+</a>
+
+</p>
+
+
+
+</form>
+
+</div>
+
+</div></div>
+
+
+
+@code {
+
+[SupplyParameterFromQuery(Name = "ErrorMessage")]
+
+public string? ErrorMessage { get; set; }
+
+
+
+private bool showPassword = false;
+
+
+
+private void TogglePasswordVisibility()
+
+{
+
+showPassword = !showPassword;
+
+}
+
+}

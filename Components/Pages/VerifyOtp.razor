@@ -1,0 +1,223 @@
+﻿@page "/verify-otp"
+@layout todolist.Components.Layout.AuthLayout
+@inject NavigationManager Navigation
+
+<PageTitle>Two-Factor Verification - TaskFlow</PageTitle>
+
+<style>
+    /* Styling to match the clean light blue background theme */
+    .auth-page {
+        position: relative;
+        min-height: 100vh;
+        background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+        /* Decorative background shapes/curves */
+        .auth-page::before {
+            content: "";
+            position: absolute;
+            top: -10%;
+            left: -10%;
+            width: 50%;
+            height: 50%;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.08) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .auth-page::after {
+            content: "";
+            position: absolute;
+            bottom: -10%;
+            right: -10%;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.08) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+    .verification-card {
+        background: #ffffff;
+        border: none;
+        border-radius: 1.25rem;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.06);
+        padding: 2.5rem;
+        width: 100%;
+        max-width: 460px;
+        position: relative;
+        z-index: 1;
+        text-align: center;
+    }
+
+    /* Top Security Shield Icon Badge */
+    .shield-badge-wrapper {
+        width: 70px;
+        height: 70px;
+        background: #f0f4ff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: -45px auto 20px auto;
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
+        border: 4px solid #ffffff;
+    }
+
+        .shield-badge-wrapper i {
+            font-size: 1.75rem;
+            color: #2563eb;
+        }
+
+    .verification-title {
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 1.6rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .verification-subtitle {
+        font-size: 0.875rem;
+        color: #64748b;
+        line-height: 1.5;
+        margin-bottom: 2rem;
+    }
+
+    .form-label-custom {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+        display: block;
+        text-align: left;
+    }
+
+    .custom-input-group {
+        border: 1px solid #cbd5e1;
+        border-radius: 0.75rem;
+        background-color: #f8fafc;
+        overflow: hidden;
+        transition: all 0.2s ease;
+    }
+
+        .custom-input-group:focus-within {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+            background-color: #ffffff;
+        }
+
+        .custom-input-group .input-group-text {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding-left: 1rem;
+        }
+
+        .custom-input-group .form-control {
+            border: none;
+            background: transparent;
+            box-shadow: none;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            color: #1e293b;
+            letter-spacing: 2px;
+        }
+
+    .btn-verify-primary {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        border: none;
+        border-radius: 0.75rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+        transition: all 0.2s ease;
+    }
+
+        .btn-verify-primary:hover {
+            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+            transform: translateY(-1px);
+        }
+
+    .form-options {
+        text-align: left;
+        margin-top: 1.25rem;
+        margin-bottom: 1.75rem;
+    }
+
+        .form-options label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: #475569;
+            user-select: none;
+        }
+
+        .form-options input[type="checkbox"] {
+            width: 1.1rem;
+            height: 1.1rem;
+            accent-color: #2563eb;
+            cursor: pointer;
+        }
+</style>
+
+<div class="auth-page">
+    <div class="verification-card">
+        <!-- Shield Badge Icon -->
+        <div class="shield-badge-wrapper">
+            <i class="bi bi-shield-lock-fill"></i>
+        </div>
+
+        <h2 class="verification-title">Security Verification</h2>
+        <p class="verification-subtitle">
+            We've sent a 6-digit code to your email address.<br />Enter it below to complete sign-in.
+        </p>
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="alert alert-danger" style="color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 0.875rem;">
+                @ErrorMessage
+            </div>
+        }
+
+        <form action="/Account/VerifyOtp" method="post" autocomplete="off">
+            <div class="mb-3">
+                <span class="form-label-custom">6-Digit Code</span>
+                <div class="input-group custom-input-group">
+                    <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+                    <input type="text"
+                           class="form-control"
+                           name="otp"
+                           maxlength="6"
+                           placeholder="Enter 6-digit code"
+                           autocomplete="one-time-code"
+                           required />
+                </div>
+            </div>
+
+            <div class="form-options">
+                <label>
+                    <input type="checkbox" name="trustDevice" value="true" checked /> Remember this device for 30 days
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-verify-primary w-100">
+                Verify & Sign In &rarr;
+            </button>
+        </form>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "ErrorMessage")]
+    public string? ErrorMessage { get; set; }
+}

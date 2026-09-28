@@ -1,0 +1,129 @@
+﻿@page "/admin/reports"
+@layout AdminLayout
+@rendermode InteractiveServer
+
+@using System.IO
+@using System.Text
+@using QuestPDF.Fluent
+@using QuestPDF.Helpers
+@using QuestPDF.Infrastructure
+@inject todolist.Services.UserService UserService
+@inject todolist.Services.TaskService TaskService
+@inject IJSRuntime JS
+
+<div style="padding: 24px; max-width: 1100px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif;">
+    <div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <h2 style="font-size: 1.5rem; font-weight: 700; color: #1a1a1a; margin-bottom: 8px;">Reports & Analytics</h2>
+        <p style="color: #6c757d; margin-bottom: 20px;">Export comprehensive system performance, user details, departments, and productivity statistics.</p>
+
+        <div style="display: flex; gap: 16px;">
+            <button @onclick="ExportTasksCsvAsync" style="background-color: #0d3b66; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                Export Tasks Report (CSV)
+            </button>
+            <button @onclick="ExportUserActivityPdfAsync" style="background-color: #198754; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                Export User Activity (PDF)
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private async Task ExportTasksCsvAsync()
+    {
+        var users = await UserService.GetAllUsersAsync() ?? new();
+        var tasks = await TaskService.GetAllTasksAsync() ?? new();
+
+        var builder = new StringBuilder();
+        // CSV Header
+        builder.AppendLine("Task ID,Task Title,Assigned User,User Email,Department,Deadline,Status");
+
+        foreach (var task in tasks)
+        {
+            var user = users.FirstOrDefault(u => u.Id == task.UserId);
+            var userName = user != null && !string.IsNullOrWhiteSpace(user.Name) ? user.Name : "Unassigned";
+            var userEmail = user?.Email ?? "N/A";
+            var department = user?.Department ?? "General";
+
+            builder.AppendLine($"\"{task.Id}\",\"{EscapeCsv(task.Title)}\",\"{EscapeCsv(userName)}\",\"{EscapeCsv(userEmail)}\",\"{EscapeCsv(department)}\",\"{task.Deadline:yyyy-MM-dd}\",\"{task.Status}\"");
+        }
+
+        var byteArray = Encoding.UTF8.GetBytes(builder.ToString());
+        using var stream = new MemoryStream(byteArray);
+        using var streamRef = new DotNetStreamReference(stream);
+
+        await JS.InvokeVoidAsync("downloadFileFromStream", $"TaskFlow_Full_Report_{DateTime.Now:yyyyMMdd}.csv", streamRef);
+    }
+
+    private async Task ExportUserActivityPdfAsync()
+    {
+        var users = await UserService.GetAllUsersAsync() ?? new();
+        var tasks = await TaskService.GetAllTasksAsync() ?? new();
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(2, Unit.Centimetre);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(10));
+
+                page.Header()
+                    .Text("TaskFlow System Performance & User Activity Report")
+                    .SemiBold().FontSize(18).FontColor("#0d3b66");
+
+                page.Content().PaddingVertical(1, Unit.Centimetre).Column(col =>
+                {
+                    col.Item().Text($"Generated on: {DateTime.Now:f}").FontSize(9).Italic();
+                    col.Item().PaddingTop(10).Text($"Total Users: {users.Count} | Total Tasks: {tasks.Count}").Bold();
+
+                    col.Item().PaddingTop(15).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(2);
+                            columns.RelativeColumn(3);
+                            columns.RelativeColumn(2);
+                            columns.RelativeColumn(1);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Element(CellStyle).Text("User Name");
+                            header.Cell().Element(CellStyle).Text("Email");
+                            header.Cell().Element(CellStyle).Text("Department");
+                            header.Cell().Element(CellStyle).Text("Assigned Tasks");
+
+                            static IContainer CellStyle(IContainer c) => c.Background("#0d3b66").Padding(5).DefaultTextStyle(x => x.Color(Colors.White).Bold());
+                        });
+
+                        foreach (var user in users)
+                        {
+                            var userTasksCount = tasks.Count(t => t.UserId == user.Id);
+                            table.Cell().Element(RowStyle).Text(string.IsNullOrWhiteSpace(user.Name) ? "N/A" : user.Name);
+                            table.Cell().Element(RowStyle).Text(user.Email ?? "N/A");
+                            table.Cell().Element(RowStyle).Text(string.IsNullOrWhiteSpace(user.Department) ? "General" : user.Department);
+                            table.Cell().Element(RowStyle).Text(userTasksCount.ToString());
+
+                            static IContainer RowStyle(IContainer c) => c.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5);
+                        }
+                    });
+                });
+
+                page.Footer().AlignCenter().Text(x =>
+                {
+                    x.Span("Page ");
+                    x.CurrentPageNumber();
+                });
+            });
+        });
+
+        var pdfBytes = document.GeneratePdf();
+        using var stream = new MemoryStream(pdfBytes);
+        using var streamRef = new DotNetStreamReference(stream);
+
+        await JS.InvokeVoidAsync("downloadFileFromStream", $"TaskFlow_User_Activity_{DateTime.Now:yyyyMMdd}.pdf", streamRef);
+    }
+
+    private string EscapeCsv(string input) => input?.Replace("\"", "\"\"") ?? string.Empty;
+}

@@ -1,0 +1,49 @@
+﻿@page "/verify-email"
+@inject todolist.Services.UserService UserService
+@inject NavigationManager Navigation
+
+<div class="card p-4 text-center">
+    @if (isProcessing)
+    {
+        <h3>Verifying your email...</h3>
+    }
+    else if (isSuccess)
+    {
+        <h3 class="text-success">Email Verified Successfully!</h3>
+        <p>You can now sign in to your account.</p>
+        <a href="/login" class="btn btn-primary">Go to Login</a>
+    }
+    else
+    {
+        <h3 class="text-danger">Verification Failed</h3>
+        <p>@errorMessage</p>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Email { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Token { get; set; }
+
+    private bool isProcessing = true;
+    private bool isSuccess = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(Email) && !string.IsNullOrEmpty(Token))
+        {
+            var (success, error) = await UserService.ConfirmEmailTokenAsync(Email, Token);
+            isSuccess = success;
+            errorMessage = error;
+        }
+        else
+        {
+            errorMessage = "Missing verification details in URL.";
+        }
+
+        isProcessing = false;
+    }
+}

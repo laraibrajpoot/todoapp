@@ -1,0 +1,71 @@
+﻿@page "/upload-image"
+@using System.IO
+@inject IWebHostEnvironment Environment
+@rendermode InteractiveServer
+
+<h3>Upload & Save Image</h3>
+
+<div style="margin-bottom: 16px;">
+    <InputFile OnChange="HandleImageUpload" accept="image/*" />
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <p style="color: @(isError ? "red" : "green");">@statusMessage</p>
+}
+
+@if (!string.IsNullOrEmpty(uploadedImageUrl))
+{
+    <div>
+        <p><strong>Saved Image Preview:</strong></p>
+        <img src="@uploadedImageUrl" alt="Uploaded Image" style="max-width: 300px; border-radius: 8px; border: 1px solid #ccc;" />
+    </div>
+}
+
+@code {
+    private string? statusMessage;
+    private string? uploadedImageUrl;
+    private bool isError;
+
+    // Maximum allowed file size (e.g., 10 MB)
+    private const long maxFileSize = 10 * 1024 * 1024;
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        statusMessage = null;
+        isError = false;
+
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            // 1. Define folder path in wwwroot
+            var uploadsFolder = Path.Combine(Environment.WebRootPath, "uploads");
+
+            // 2. Ensure folder exists
+            if (!Directory.Exists(uploadsFolder))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            // 3. Generate a unique file name to avoid overwriting existing files
+            var trustedFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.Name)}";
+            var filePath = Path.Combine(uploadsFolder, trustedFileName);
+
+            // 4. Save file to disk
+            await using var stream = file.OpenReadStream(maxFileSize);
+            await using var fs = new FileStream(filePath, FileMode.Create);
+            await stream.CopyToAsync(fs);
+
+            // 5. Update UI preview path
+            uploadedImageUrl = $"/uploads/{trustedFileName}";
+            statusMessage = "Image saved successfully!";
+        }
+        catch (Exception ex)
+        {
+            isError = true;
+            statusMessage = $"Error saving image: {ex.Message}";
+        }
+    }
+}

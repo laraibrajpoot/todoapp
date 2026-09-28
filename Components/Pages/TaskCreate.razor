@@ -1,0 +1,52 @@
+@page "/tasks/create"
+@using todolist.Models
+@using todolist.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject TaskService TaskService
+@inject NavigationManager NavigationManager
+
+<h3>Create Task</h3>
+<div class="ffc-card">
+    <EditForm Model="task" OnValidSubmit="HandleCreateTask">
+        <div class="mb-2">
+            <InputText class="form-control" @bind-Value="task.Title" placeholder="Title" required />
+        </div>
+        <div class="mb-2">
+            <InputTextArea class="form-control" @bind-Value="task.Description" placeholder="Description" />
+        </div>
+        <div class="mb-2">
+            <InputDate class="form-control" @bind-Value="task.Deadline" />
+        </div>
+        <div>
+            <button class="ffc-btn" type="submit">Create</button>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    private TaskItem task = new();
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private async Task HandleCreateTask()
+    {
+        var authState = await AuthStateTask;
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(userIdClaim, out var userId))
+            {
+                // Pass the task and the active user's ID from claims
+                await TaskService.AddTaskAsync(task, userId);
+                NavigationManager.NavigateTo("/user/tasks");
+                return;
+            }
+        }
+
+        // Redirect to login if user session expired or null
+        NavigationManager.NavigateTo("/login");
+    }
+}

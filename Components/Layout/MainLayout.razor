@@ -1,0 +1,95 @@
+﻿@inherits LayoutComponentBase
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigation
+@inject todolist.Services.UserService UserService
+@using System.Security.Claims
+
+<div class="user-layout" style="display: flex; flex-direction: column; height: 100vh; overflow: hidden;" @onclick="CloseAllDropdowns">
+    <header class="top-bar" style="height: 64px; background: #0f172a; display: flex; justify-content: space-between; align-items: center; padding: 0 24px; color: white; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <div class="sidebar-brand" style="display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.2rem;">
+            <div style="width: 28px; height: 28px; background: #2563eb; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.9rem;">✓</div>
+            TaskFlow
+        </div>
+
+        <div class="top-bar-actions" style="display: flex; align-items: center; gap: 16px;">
+            <!-- Notification Bell Component -->
+            <div style="position: relative; display: inline-block;" @onclick:stopPropagation="true">
+                <NotificationBell CurrentUserId="@currentUserId" />
+            </div>
+
+            <!-- Profile Dropdown Menu -->
+            <div style="position: relative; display: inline-block;" @onclick:stopPropagation="true">
+                <div @onclick="ToggleDropdown" style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: rgba(255,255,255,0.08); padding: 4px 12px; border-radius: 20px;">
+                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #2563eb; display: flex; align-items: center; justify-content: center; overflow: hidden; color: white; font-weight: bold; font-size: 0.9rem;">
+                        <span>@(string.IsNullOrEmpty(displayName) ? "U" : displayName.Substring(0, 1).ToUpper())</span>
+                    </div>
+                    <span class="top-bar-user" style="color: white; font-size: 0.9rem; font-weight: 500;">@displayName</span>
+                    <span style="color: #cbd5e1; font-size: 0.75rem;">▼</span>
+                </div>
+
+                @if (isDropdownOpen)
+                {
+                    <div style="position: absolute; right: 0; top: 46px; background: white; color: #1e293b; border-radius: 12px; box-shadow: 0 10px 25px -3px rgba(0,0,0,0.2); width: 210px; z-index: 9999; overflow: hidden; border: 1px solid #e2e8f0; padding: 6px;">
+                        <div @onclick="NavigateToProfile" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-radius: 8px;">
+                            <span>👤</span> View Profile
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <button class="btn-logout" @onclick="HandleLogout" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Logout</button>
+        </div>
+    </header>
+
+    <div class="main-body" style="display: flex; flex: 1; overflow: hidden;">
+        <aside class="sidebar" style="width: 260px; background: #0f172a; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.05);">
+            <div style="padding-top: 16px; flex: 1;">
+                <NavMenu />
+            </div>
+        </aside>
+
+        <main class="content-area" style="flex: 1; background: #f8fafc; overflow-y: auto; padding: 24px;">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private string displayName = "User";
+    private bool isDropdownOpen = false;
+    private int currentUserId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is { IsAuthenticated: true })
+        {
+            var idClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                       ?? user.FindFirst("sub")?.Value 
+                       ?? user.FindFirst("UserId")?.Value;
+
+            if (int.TryParse(idClaim, out var parsedId))
+            {
+                currentUserId = parsedId;
+            }
+
+            var identifier = user.FindFirst(ClaimTypes.Email)?.Value ?? user.Identity.Name;
+            if (!string.IsNullOrEmpty(identifier))
+            {
+                var dbUser = await UserService.GetUserByEmailAsync(identifier);
+                if (dbUser != null)
+                {
+                    currentUserId = dbUser.Id;
+                    displayName = dbUser.Name ?? dbUser.Email;
+                }
+            }
+        }
+    }
+
+    private void ToggleDropdown() { isDropdownOpen = !isDropdownOpen; }
+    private void CloseAllDropdowns() { isDropdownOpen = false; }
+    private void NavigateToProfile() { isDropdownOpen = false; Navigation.NavigateTo("/user/profile"); }
+    private void HandleLogout() { Navigation.NavigateTo("/Account/Logout", true); }
+}

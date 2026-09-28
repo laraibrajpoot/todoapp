@@ -1,0 +1,267 @@
+﻿@page "/signup"
+@layout todolist.Components.Layout.AuthLayout
+@rendermode InteractiveServer
+@inject todolist.Services.UserService UserService
+@inject NavigationManager Navigation
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Sign Up - TaskFlow</PageTitle>
+
+<style>
+    /* Left panel with the spiral background matching login */
+    .auth-left {
+        position: relative;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%);
+        overflow: hidden;
+        padding: 0;
+        display: flex;
+        flex-direction: row;   /* Added: resets column flow from auth.css */
+        justify-content: center;
+        align-items: center;
+        width: 50%;
+        min-height: 100vh;
+    }
+
+        /* Decorative Spiral / Wave background lines */
+        .auth-left::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-image: repeating-radial-gradient( circle at 0% 50%, transparent, transparent 30px, rgba(255, 255, 255, 0.04) 30px, rgba(255, 255, 255, 0.04) 60px );
+            transform: rotate(25deg);
+            pointer-events: none;
+        }
+
+        .auth-left::after {
+            content: "";
+            position: absolute;
+            bottom: -20px;
+            left: -20px;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+    /* Wrapper set to full height and width */
+    .illustration-wrapper {
+        width: 100%;
+        height: 100%;
+        flex: 1;                /* Added: allows wrapper to expand edge-to-edge */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1;
+    }
+
+    /* Stretches the image to fill top and bottom completely while keeping width intact */
+    .auth-illustration-img {
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+        border-radius: 0;
+        filter: drop-shadow(0 15px 35px rgba(0, 0, 0, 0.35));
+    }
+
+    /* Custom Theme overrides */
+    .btn-navy-primary {
+        background-color: #0d3b66 !important;
+        border-color: #0d3b66 !important;
+        color: #ffffff !important;
+        font-weight: 600;
+    }
+
+        .btn-navy-primary:hover {
+            background-color: #092c4d !important;
+            border-color: #092c4d !important;
+        }
+</style>
+
+<div class="auth-page">
+    <!-- Left Panel with Stretched Height Image and Spiral Background -->
+    <div class="auth-left">
+        <div class="illustration-wrapper">
+            <img src="/images/sidebarpic.png" alt="TaskFlow Illustration" class="auth-illustration-img" />
+        </div>
+    </div>
+
+    <div class="auth-right">
+        <div class="login-card">
+            <h2>@(isOtpSent ? "Verify Email" : "Create Account")</h2>
+
+            @if (!string.IsNullOrEmpty(errorMessage) && isOtpSent)
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">@successMessage</div>
+            }
+
+            @if (isOtpSent)
+            {
+                <EditForm Model="@otpModel" OnValidSubmit="HandleVerifyOtp">
+                    <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
+                        A 6-digit code has been sent to <strong>@register.Email</strong>. Please enter it below to complete registration.
+                    </p>
+
+                    <div class="form-group mb-3">
+                        <label>Verification Code</label>
+                        <InputText class="form-control" @bind-Value="otpModel.OtpCode" placeholder="Enter 6-digit OTP" maxlength="6" required />
+                    </div>
+
+                    <button type="submit" disabled="@isProcessing" class="login-btn btn btn-primary w-100 btn-navy-primary">
+                        @(isProcessing ? "Verifying..." : "Verify Code")
+                    </button>
+
+                    <p class="signup-link" style="text-align: center; margin-top: 20px; font-size: 0.9rem;">
+                        Back to <a href="/login" @onclick="NavigateToLogin" style="color: #0d3b66; font-weight: 600;">Sign In</a>
+                    </p>
+                </EditForm>
+            }
+            else
+            {
+                <EditForm Model="@register" OnValidSubmit="HandleRegister">
+                    <DataAnnotationsValidator />
+
+                    <!-- Name Field -->
+                    <div class="form-group mb-3">
+                        <label>Full Name</label>
+                        <InputText class="form-control" @bind-Value="register.Name" placeholder="Enter your full name" />
+                        <ValidationMessage For="@(() => register.Name)" class="text-danger small mt-1" />
+                    </div>
+
+                    <!-- Email Address Field -->
+                    <div class="form-group mb-3">
+                        <label>Email Address</label>
+                        <InputText class="form-control" @bind-Value="register.Email" type="email" placeholder="Enter your email" />
+                        <ValidationMessage For="@(() => register.Email)" class="text-danger small mt-1" />
+                    </div>
+
+                    <!-- Password Field -->
+                    <div class="form-group mb-3">
+                        <label>Password</label>
+                        <InputText class="form-control" @bind-Value="register.Password" type="password" placeholder="Enter your password" />
+                        <ValidationMessage For="@(() => register.Password)" class="text-danger small mt-1" />
+                    </div>
+
+                    <!-- Confirm Password Field -->
+                    <div class="form-group mb-3">
+                        <label>Confirm Password</label>
+                        <InputText class="form-control" @bind-Value="register.ConfirmPassword" type="password" placeholder="Confirm password" />
+                        @if (!string.IsNullOrEmpty(passwordMismatchError))
+                        {
+                            <div class="text-danger small mt-1">@passwordMismatchError</div>
+                        }
+                    </div>
+
+                    <button type="submit" disabled="@isProcessing" class="login-btn btn btn-primary w-100 btn-navy-primary">
+                        @(isProcessing ? "Sending Code..." : "Create Account")
+                    </button>
+
+                    <p class="signup-link" style="text-align: center; margin-top: 20px; font-size: 0.9rem;">
+                        Already have an account? <a href="/login" @onclick="NavigateToLogin" style="color: #0d3b66; font-weight: 600;">Sign In</a>
+                    </p>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterModel register = new RegisterModel();
+    private OtpModel otpModel = new OtpModel();
+
+    private bool isOtpSent = false;
+    private bool isProcessing = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private string passwordMismatchError = string.Empty;
+
+    private async Task HandleRegister()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        passwordMismatchError = string.Empty;
+
+        if (register.Password != register.ConfirmPassword)
+        {
+            passwordMismatchError = "Passwords do not match.";
+            return;
+        }
+
+        isProcessing = true;
+
+        var result = await UserService.RegisterUserAsync(register.Email, register.Password, "User", register.Name);
+
+        if (result.IsExistingUser)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        else if (result.Success)
+        {
+            isOtpSent = true;
+            successMessage = "A 6-digit verification code has been sent to your email.";
+        }
+        else
+        {
+            errorMessage = result.ErrorMessage ?? "Registration failed. Please try again.";
+        }
+
+        isProcessing = false;
+    }
+
+    private async Task HandleVerifyOtp()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        isProcessing = true;
+
+        var result = await UserService.VerifySignUpOtpAsync(register.Email, otpModel.OtpCode);
+
+        if (result.Success)
+        {
+            successMessage = "Email verified successfully! Redirecting to Sign In...";
+            await Task.Delay(1500);
+            Navigation.NavigateTo("/login");
+        }
+        else
+        {
+            errorMessage = result.Error ?? "Invalid or expired verification code.";
+        }
+
+        isProcessing = false;
+    }
+
+    private void NavigateToLogin()
+    {
+        Navigation.NavigateTo("/login");
+    }
+
+    private class RegisterModel
+    {
+        [Required(ErrorMessage = "Name is required")]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required")]
+        [MinLength(6, ErrorMessage = "Password must be at least 6 characters long.")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Please confirm your password")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
+    private class OtpModel
+    {
+        public string OtpCode { get; set; } = string.Empty;
+    }
+}

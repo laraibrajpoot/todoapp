@@ -1,0 +1,192 @@
+﻿/* 1. Global Viewport Reset */
+html, body, #app, .blazor-app-root {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important; /* Prevents outer window scrolling */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8fafc;
+    transform: none !important;
+    filter: none !important;
+}
+
+/* 2. Outer Layout Containers */
+.app-layout, .user-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    overflow: hidden !important;
+}
+
+/* 3. Topbar Rules */
+.top-navbar, .top-bar {
+    height: 60px !important;
+    min-height: 60px !important;
+    max-height: 60px !important;
+    width: 100% !important;
+    background-color: #0d3b66 !important;
+    color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 0 24px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    flex-shrink: 0 !important;
+    z-index: 1000 !important;
+}
+
+/* 4. Lower Body Wrappers */
+.body-wrapper, .main-body {
+    display: flex !important;
+    flex: 1 !important;
+    height: calc(100vh - 60px) !important;
+    max-height: calc(100vh - 60px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* 5. Sidebar Rules */
+.sidebar {
+    width: 240px !important;
+    min-width: 240px !important;
+    height: 100% !important;
+    background-color: #0d3b66 !important;
+    padding-top: 1rem !important;
+    flex-shrink: 0 !important;
+    overflow-y: auto !important;
+}
+
+/* 6. Main Scrollable Content Area */
+.main-content, .content-area {
+    flex: 1 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important; /* Only this container scrolls */
+    padding: 24px !important;
+    background-color: #f1f5f9 !important;
+    box-sizing: border-box !important;
+}
+
+/* Navigation Links */
+/* Navigation Links */
+.nav-menu {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.nav-link {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px 24px !important;
+    color: #94a3b8 !important;
+    text-decoration: none !important;
+    font-weight: 500 !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    border: none !important;
+}
+
+    .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        color: white !important;
+        transform: translateX(4px) !important;
+    }
+
+    .nav-link:active {
+        transform: scale(0.95) !important;
+    }
+
+    .nav-link.active {
+        background-color: #2563eb !important;
+        color: white !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        transform: none !important;
+    }
+/* Buttons and Typography */
+.brand-title {
+    font-size: 1.4rem !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+}
+
+.user-actions, .top-bar-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    color: #ffffff !important;
+}
+
+.btn-logout, .logout-btn {
+    color: #ffffff !important;
+    border: 1px solid #ffffff !important;
+    background: transparent !important;
+    padding: 6px 14px !important;
+    border-radius: 4px !important;
+    text-decoration: none !important;
+    font-size: 0.875rem !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+}
+
+    .btn-logout:hover, .logout-btn:hover {
+        background-color: #ffffff !important;
+        color: #0d3b66 !important;
+    }
+/* =========================================================
+   ABSOLUTE VIEWPORT LOCK (BYPASSES BOOTSTRAP FLEX CONFLICTS)
+   ========================================================= */
+
+/* 1. Kill window scrollbar entirely */
+html, body, #app, app, .blazor-app-root {
+    height: 100vh !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important; /* Disables outer browser window scroll */
+}
+
+/* 2. Topbar - Anchored to browser top edge */
+.fixed-topbar, .top-navbar, .top-bar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 60px !important;
+    background-color: #0d3b66 !important;
+    color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 0 24px !important;
+    z-index: 99999 !important; /* Floats above everything */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+/* 3. Sidebar - Anchored below topbar on the left */
+.fixed-sidebar, .sidebar {
+    position: fixed !important;
+    top: 60px !important; /* Below 60px topbar */
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 220px !important;
+    background-color: #0d3b66 !important;
+    z-index: 9999 !important;
+    overflow-y: auto !important;
+}
+
+/* 4. Main Dashboard Area - ONLY section with a scrollbar */
+.scrollable-content, .main-content, .content-area {
+    position: fixed !important;
+    top: 60px !important; /* Shifted down by topbar height */
+    left: 220px !important; /* Shifted right by sidebar width */
+    right: 0 !important;
+    bottom: 0 !important;
+    overflow-y: auto !important; /* ONLY DASHBOARD CONTENT SCROLLS */
+    padding: 24px !important;
+    background-color: #f8fafc !important;
+    box-sizing: border-box !important;
+}
