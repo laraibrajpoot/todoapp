@@ -91,7 +91,7 @@ namespace todolist
                 app.UseHsts();
             }
 
-            app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+            app.UseStatusCodePagesWithReExecute("/StatusCode/{0}");
             app.UseHttpsRedirection();
 
             // Required to serve dynamically uploaded files from wwwroot/uploads
